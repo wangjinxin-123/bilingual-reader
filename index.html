@@ -8,6 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=Inter:wght@300;400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Noto+Sans+SC:wght@300;400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="bilingual_reader.css">
+    <script src="https://imgcache.qq.com/qcloud/tcbjs/2.19.0/tcb.js"></script>
 </head>
 <body>
     <div class="bg-animation">
@@ -37,7 +38,8 @@
                     </div>
                     <nav class="nav">
                         <button class="nav-btn active" data-view="list">文章列表</button>
-                        <button class="nav-btn" data-view="upload">上传文章</button>
+                        <button class="nav-btn" data-view="upload" id="upload-btn">上传文章</button>
+                        <button class="nav-btn admin-btn" id="admin-btn">管理员登录</button>
                     </nav>
                 </div>
             </div>
@@ -181,5 +183,36 @@
             </form>
         </div>
     </div>
+
+    <div class="modal-overlay" id="admin-modal">
+        <div class="modal" style="max-width: 400px;">
+            <h3 class="modal-title">管理员登录</h3>
+            <form id="admin-form" style="text-align: left;">
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label class="form-label" style="font-size: 13px; margin-bottom: 6px;">请输入管理员密钥</label>
+                    <input type="password" class="form-input" id="admin-key" style="font-size: 14px; padding: 12px 16px;" placeholder="输入密钥..." required>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="modal-btn cancel" id="admin-modal-cancel">取消</button>
+                    <button type="submit" class="modal-btn confirm">登录</button>
+                </div>
+            </form>
+            <p id="admin-status" style="margin-top: 15px; font-size: 12px; color: #666; text-align: center; display: none;"></p>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="logout-modal">
+        <div class="modal">
+            <div class="modal-icon">🔒</div>
+            <h3 class="modal-title">确认退出登录</h3>
+            <p class="modal-text">确定要退出管理员账号吗？</p>
+            <div class="modal-actions">
+                <button class="modal-btn cancel" id="logout-cancel">取消</button>
+                <button class="modal-btn confirm" id="logout-confirm">确认退出</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast-container"></div>
 </body>
 </html>

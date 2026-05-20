@@ -1,3 +1,13 @@
+const ADMIN_KEY = '323157';
+
+// ⚠️ 请替换为你自己的腾讯云开发配置
+const tcbConfig = {
+    env: 'bilingual-reader-d2emwnwecc8dfea6'  // 替换为你的环境 ID
+};
+
+// 初始化腾讯云开发
+const app = tcb.init(tcbConfig);
+
 class BilingualReader {
     constructor() {
         this.articles = [];
@@ -6,15 +16,73 @@ class BilingualReader {
         this.searchQuery = '';
         this.deletingArticleId = null;
         this.editingArticleId = null;
+        this.isAdmin = false;
         this.init();
     }
 
-    init() {
-        this.loadFromStorage();
+    async init() {
+        await this.loadFromStorage();
+        this.checkAdminStatus();
         this.bindEvents();
         this.renderArticles();
         this.renderTags();
         this.initStreaks();
+        this.updateAdminUI();
+    }
+
+    showToast(message, type = 'success') {
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        
+        let icon = '✓';
+        if (type === 'error') icon = '✕';
+        if (type === 'warning') icon = '⚠';
+        
+        toast.innerHTML = `
+            <span class="toast-icon">${icon}</span>
+            <span class="toast-content">${message}</span>
+        `;
+        
+        container.appendChild(toast);
+        
+        setTimeout(() => {
+            toast.style.animation = 'toastSlideOut 0.3s cubic-bezier(0.7, 0, 0.84, 0) forwards';
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }
+
+    checkAdminStatus() {
+        const adminExpire = localStorage.getItem('admin_expire');
+        if (adminExpire && Date.now() < parseInt(adminExpire)) {
+            this.isAdmin = true;
+        }
+    }
+
+    setAdminStatus(isAdmin) {
+        this.isAdmin = isAdmin;
+        if (isAdmin) {
+            localStorage.setItem('admin_expire', (Date.now() + 24 * 60 * 60 * 1000).toString());
+        } else {
+            localStorage.removeItem('admin_expire');
+        }
+        this.updateAdminUI();
+        this.renderArticles();
+    }
+
+    updateAdminUI() {
+        const adminBtn = document.getElementById('admin-btn');
+        const uploadBtn = document.getElementById('upload-btn');
+        
+        if (this.isAdmin) {
+            adminBtn.textContent = '管理员已登录';
+            adminBtn.style.backgroundColor = '#10b981';
+            uploadBtn.style.display = 'inline-block';
+        } else {
+            adminBtn.textContent = '管理员登录';
+            adminBtn.style.backgroundColor = '';
+            uploadBtn.style.display = 'none';
+        }
     }
 
     initStreaks() {
@@ -125,38 +193,67 @@ class BilingualReader {
         }, 500 + Math.random() * 800);
     }
 
-    loadFromStorage() {
-        const stored = localStorage.getItem('bilingual_articles');
-        if (stored) {
-            this.articles = JSON.parse(stored);
-        } else {
-            this.articles = this.getSampleArticles();
-            this.saveToStorage();
+    async loadFromStorage() {
+        try {
+            const db = app.database();
+            const result = await db.collection('articles').orderBy('createdAt', 'desc').get();
+            
+            if (result.data.length === 0) {
+                await this.addSampleArticles();
+                const newResult = await db.collection('articles').orderBy('createdAt', 'desc').get();
+                this.articles = newResult.data.map(this.convertToArticle);
+            } else {
+                this.articles = result.data.map(this.convertToArticle);
+            }
+            this.filteredArticles = [...this.articles];
+        } catch (error) {
+            console.error('加载数据失败:', error);
+            this.showToast('加载数据失败，请检查网络连接', 'error');
+            this.articles = [];
+            this.filteredArticles = [];
         }
-        this.filteredArticles = [...this.articles];
     }
 
-    saveToStorage() {
-        localStorage.setItem('bilingual_articles', JSON.stringify(this.articles));
+    convertToArticle(record) {
+        return {
+            id: record._id,
+            objectId: record._id,
+            title: record.title,
+            english: record.english,
+            chinese: record.chinese,
+            tags: record.tags || [],
+            level: record.level || 'intermediate',
+            date: record.date || new Date().toISOString().split('T')[0],
+            createdAt: record.createdAt
+        };
+    }
+
+    async addSampleArticles() {
+        const samples = this.getSampleArticles();
+        const db = app.database();
+        for (const sample of samples) {
+            await db.collection('articles').add({
+                title: sample.title,
+                english: sample.english,
+                chinese: sample.chinese,
+                tags: sample.tags,
+                level: sample.level,
+                date: sample.date
+            });
+        }
     }
 
     getSampleArticles() {
         return [
             {
-                id: 1,
                 title: "Climate and Earth Systems",
-                english: `To understand climate, we must look at the "horizon" of the whole Earth system. Over the "globe", the "ocean" and "marine" regions affect the air. The "current" inside the ocean may flow like a "stream" or a "torrent", moving heat and influencing the atmosphere. Sea "tide" and "source" water also matter. Warm water can produce "evaporation", turning liquid into "vapour". That vapour then "circulates" through the air and eventually "precipitate"s as rain.
-
-On dry days, the same processes lead to "arid" land. In arid regions, the ground lacks "moist" air and becomes "dry" or "damp" depending on season. When the air is "humid", clouds grow thicker and the sky becomes "stormy". Many storms begin with "gust" winds, then turn into "gale", and later become "hurricane" or even "tornado". In extreme cases, a "catastrophic" event may endanger communities.`,
-                chinese: `要理解气候，我们必须从整个地球系统的"视野"来观察。在"全球"范围内，"海洋"和"海洋"区域影响着大气。海洋内部的"洋流"可能像"溪流"或"激流"一样流动，输送热量并影响大气。海洋"潮汐"和"源头"水也很重要。温暖的水会产生"蒸发"，将液体转化为"蒸汽"。然后，这些蒸汽在空气中"循环"，最终以降水的形式"沉降"为雨。
-
-在干燥的日子里，同样的过程也会导致"干旱"的土地。在干旱地区，地面缺少"湿润"的空气，因此可能变得干燥，或在不同季节呈现"潮湿"。当空气"潮湿"时，云层会变厚，天空会变得"暴风雨"。许多风暴从"阵风"开始，随后发展成"大风"，再进一步变成"飓风"，甚至演变为"龙卷风"。在极端情况下，一个"灾难性的"事件可能会危及社区。`,
+                english: `To understand climate, we must look at the "horizon" of the whole Earth system. Over the "globe", the "ocean" and "marine" regions affect the air. The "current" inside the ocean may flow like a "stream" or a "torrent", moving heat and influencing the atmosphere. Sea "tide" and "source" water also matter. Warm water can produce "evaporation", turning liquid into "vapour". That vapour then "circulates" through the air and eventually "precipitate"s as rain.\n\nOn dry days, the same processes lead to "arid" land. In arid regions, the ground lacks "moist" air and becomes "dry" or "damp" depending on season. When the air is "humid", clouds grow thicker and the sky becomes "stormy". Many storms begin with "gust" winds, then turn into "gale", and later become "hurricane" or even "tornado". In extreme cases, a "catastrophic" event may endanger communities.`,
+                chinese: `要理解气候，我们必须从整个地球系统的"视野"来观察。在"全球"范围内，"海洋"和"海洋"区域影响着大气。海洋内部的"洋流"可能像"溪流"或"激流"一样流动，输送热量并影响大气。海洋"潮汐"和"源头"水也很重要。温暖的水会产生"蒸发"，将液体转化为"蒸汽"。然后，这些蒸汽在空气中"循环"，最终以降水的形式"沉降"为雨。\n\n在干燥的日子里，同样的过程也会导致"干旱"的土地。在干旱地区，地面缺少"湿润"的空气，因此可能变得干燥，或在不同季节呈现"潮湿"。当空气"潮湿"时，云层会变厚，天空会变得"暴风雨"。许多风暴从"阵风"开始，随后发展成"大风"，再进一步变成"飓风"，甚至演变为"龙卷风"。在极端情况下，一个"灾难性的"事件可能会危及社区。`,
                 tags: ["自然", "地理", "气候"],
                 level: "intermediate",
                 date: "2024-01-15"
             },
             {
-                id: 2,
                 title: "The Art of Slow Living",
                 english: "In a world that constantly pushes us to move faster, do more, and achieve greater heights, there's a growing movement towards slow living. This philosophy encourages us to savor each moment, find joy in simplicity, and cultivate mindfulness in our daily lives.\n\nSlow living is not about being unproductive or lazy; rather, it's about intentionality. It's about focusing on what truly matters, eliminating unnecessary busyness, and creating space for the things that bring us genuine happiness and fulfillment.",
                 chinese: "在一个不断推动我们更快前进、做得更多、追求更高成就的世界里，慢生活的运动正在兴起。这种哲学鼓励我们品味每一个时刻，在简单中寻找快乐，并在日常生活中培养正念。\n\n慢生活并不是指不高效或懒惰；相反，它是关于 intentionality（ intentionality）。它是关于专注于真正重要的事情，消除不必要的忙碌，为那些给我们带来真正快乐和满足感的事情创造空间。",
@@ -165,7 +262,6 @@ On dry days, the same processes lead to "arid" land. In arid regions, the ground
                 date: "2024-01-10"
             },
             {
-                id: 3,
                 title: "Climate Change: A Call to Action",
                 english: "Climate change is one of the most pressing issues of our time, affecting every corner of the globe. The scientific evidence is clear: human activities are fundamentally altering our planet's climate system, with far-reaching consequences for ecosystems, economies, and human well-being.\n\nThe impacts of climate change are already evident. Rising global temperatures, extreme weather events, melting ice caps, and sea-level rise are just a few of the changes we're witnessing.",
                 chinese: "气候变化是我们这个时代最紧迫的问题之一，影响着全球的每一个角落。科学证据是明确的：人类活动正在从根本上改变我们星球的气候系统，对生态系统、经济和人类福祉产生深远的影响。\n\n气候变化的影响已经显而易见。全球气温上升、极端天气事件、冰盖融化和海平面上升只是我们正在目睹的一些变化。",
@@ -179,7 +275,15 @@ On dry days, the same processes lead to "arid" land. In arid regions, the ground
     bindEvents() {
         document.querySelectorAll('.nav-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
-                this.switchView(e.target.dataset.view);
+                if (e.target.id === 'admin-btn') {
+                    if (this.isAdmin) {
+                        this.showLogoutModal();
+                    } else {
+                        this.showAdminModal();
+                    }
+                } else {
+                    this.switchView(e.target.dataset.view);
+                }
             });
         });
 
@@ -194,6 +298,10 @@ On dry days, the same processes lead to "arid" land. In arid regions, the ground
         });
 
         document.getElementById('btn-batch').addEventListener('click', () => {
+            if (!this.isAdmin) {
+                this.showToast('请先登录管理员账号！', 'warning');
+                return;
+            }
             this.loadBatchSamples();
         });
 
@@ -239,6 +347,73 @@ On dry days, the same processes lead to "arid" land. In arid regions, the ground
                 this.closeArticleModal();
             }
         });
+
+        document.getElementById('admin-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.verifyAdmin();
+        });
+
+        document.getElementById('admin-modal-cancel').addEventListener('click', () => {
+            this.closeAdminModal();
+        });
+
+        document.getElementById('admin-modal').addEventListener('click', (e) => {
+            if (e.target.id === 'admin-modal') {
+                this.closeAdminModal();
+            }
+        });
+
+        document.getElementById('logout-cancel').addEventListener('click', () => {
+            this.closeLogoutModal();
+        });
+
+        document.getElementById('logout-confirm').addEventListener('click', () => {
+            this.confirmLogout();
+        });
+
+        document.getElementById('logout-modal').addEventListener('click', (e) => {
+            if (e.target.id === 'logout-modal') {
+                this.closeLogoutModal();
+            }
+        });
+    }
+
+    showAdminModal() {
+        document.getElementById('admin-key').value = '';
+        document.getElementById('admin-status').style.display = 'none';
+        document.getElementById('admin-modal').classList.add('show');
+    }
+
+    closeAdminModal() {
+        document.getElementById('admin-modal').classList.remove('show');
+    }
+
+    verifyAdmin() {
+        const inputKey = document.getElementById('admin-key').value;
+        
+        if (inputKey === ADMIN_KEY) {
+            this.setAdminStatus(true);
+            this.closeAdminModal();
+            this.showToast('登录成功！', 'success');
+        } else {
+            document.getElementById('admin-status').textContent = '密钥错误，请重试！';
+            document.getElementById('admin-status').style.display = 'block';
+            document.getElementById('admin-status').style.color = '#ef4444';
+        }
+    }
+
+    showLogoutModal() {
+        document.getElementById('logout-modal').classList.add('show');
+    }
+
+    closeLogoutModal() {
+        document.getElementById('logout-modal').classList.remove('show');
+    }
+
+    confirmLogout() {
+        this.setAdminStatus(false);
+        this.closeLogoutModal();
+        this.showToast('已退出登录！', 'success');
     }
 
     switchView(view) {
@@ -334,6 +509,10 @@ On dry days, the same processes lead to "arid" land. In arid regions, the ground
         grid.querySelectorAll('.card-action-btn.edit').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
+                if (!this.isAdmin) {
+                    this.showToast('请先登录管理员账号！', 'warning');
+                    return;
+                }
                 this.showEditModal(btn.closest('.article-card').dataset.id);
             });
         });
@@ -346,24 +525,30 @@ On dry days, the same processes lead to "arid" land. In arid regions, the ground
             advanced: '高级'
         };
         
+        const deleteBtn = this.isAdmin ? `
+            <button class="card-action-btn delete" title="删除">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                    <path d="M3 6h18"></path>
+                    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                </svg>
+            </button>
+        ` : '';
+        
         return `
             <div class="article-card" data-id="${article.id}">
                 <div class="card-header">
                     <h2 class="card-title">${article.title}</h2>
                     <div class="card-actions">
+                        ${this.isAdmin ? `
                         <button class="card-action-btn edit" title="编辑">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
                                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                             </svg>
                         </button>
-                        <button class="card-action-btn delete" title="删除">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
-                                <path d="M3 6h18"></path>
-                                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
-                                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
-                            </svg>
-                        </button>
+                        ` : ''}
+                        ${deleteBtn}
                     </div>
                 </div>
                 <span class="card-level ${article.level}">${levelLabels[article.level] || '中级'}</span>
@@ -401,10 +586,22 @@ On dry days, the same processes lead to "arid" land. In arid regions, the ground
             zh: zhParagraphs[i] || ''
         }));
         
+        const deleteBtn = this.isAdmin ? `
+            <button class="detail-action-btn delete" data-id="${article.id}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                    <path d="M3 6h18"></path>
+                    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                </svg>
+                删除
+            </button>
+        ` : '';
+        
         document.getElementById('article-detail').innerHTML = `
             <div class="detail-header">
                 <h1 class="detail-title">${article.title}</h1>
                 <div class="detail-actions">
+                    ${this.isAdmin ? `
                     <button class="detail-action-btn edit" data-id="${article.id}">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
                             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
@@ -412,14 +609,8 @@ On dry days, the same processes lead to "arid" land. In arid regions, the ground
                         </svg>
                         编辑
                     </button>
-                    <button class="detail-action-btn delete" data-id="${article.id}">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
-                            <path d="M3 6h18"></path>
-                            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
-                            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
-                        </svg>
-                        删除
-                    </button>
+                    ` : ''}
+                    ${deleteBtn}
                 </div>
             </div>
             <div class="detail-meta">
@@ -438,13 +629,15 @@ On dry days, the same processes lead to "arid" land. In arid regions, the ground
             </div>
         `;
 
-        document.querySelector('.detail-action-btn.edit').addEventListener('click', () => {
-            this.showEditModal(article.id);
-        });
+        if (this.isAdmin) {
+            document.querySelector('.detail-action-btn.edit')?.addEventListener('click', () => {
+                this.showEditModal(article.id);
+            });
 
-        document.querySelector('.detail-action-btn.delete').addEventListener('click', () => {
-            this.showDeleteModal(article.id);
-        });
+            document.querySelector('.detail-action-btn.delete')?.addEventListener('click', () => {
+                this.showDeleteModal(article.id);
+            });
+        }
         
         this.switchView('detail');
     }
@@ -491,7 +684,12 @@ On dry days, the same processes lead to "arid" land. In arid regions, the ground
         document.body.style.overflow = '';
     }
 
-    addArticle() {
+    async addArticle() {
+        if (!this.isAdmin) {
+            this.showToast('请先登录管理员账号！', 'warning');
+            return;
+        }
+        
         const title = document.getElementById('article-title').value.trim();
         const tags = document.getElementById('article-tags').value.split(',').map(t => t.trim()).filter(t => t);
         const level = document.getElementById('article-level').value;
@@ -499,54 +697,59 @@ On dry days, the same processes lead to "arid" land. In arid regions, the ground
         const chinese = document.getElementById('article-chinese').value.trim();
         
         if (!title || !english || !chinese) {
-            alert('请填写完整信息！');
+            this.showToast('请填写完整信息！', 'error');
             return;
         }
         
-        const newArticle = {
-            id: Date.now(),
-            title,
-            english,
-            chinese,
-            tags: tags.length ? tags : ['未分类'],
-            level,
-            date: new Date().toISOString().split('T')[0]
-        };
-        
-        this.articles.unshift(newArticle);
-        this.filteredArticles = [...this.articles];
-        this.saveToStorage();
-        this.renderArticles();
-        this.renderTags();
-        
-        document.getElementById('upload-form').reset();
-        alert('文章添加成功！');
-        this.switchView('list');
+        try {
+            const db = app.database();
+            await db.collection('articles').add({
+                title: title,
+                english: english,
+                chinese: chinese,
+                tags: tags.length ? tags : ['未分类'],
+                level: level,
+                date: new Date().toISOString().split('T')[0]
+            });
+            
+            await this.loadFromStorage();
+            this.renderArticles();
+            this.renderTags();
+            
+            document.getElementById('upload-form').reset();
+            this.showToast('文章添加成功！', 'success');
+            this.switchView('list');
+        } catch (error) {
+            console.error('添加文章失败:', error);
+            this.showToast('添加文章失败，请重试', 'error');
+        }
     }
 
-    loadBatchSamples() {
-        if (this.articles.length > 3) {
-            alert('示例文章已加载！');
+    async loadBatchSamples() {
+        if (!this.isAdmin) {
+            this.showToast('请先登录管理员账号！', 'warning');
             return;
         }
 
-        const samples = this.getSampleArticles();
-        samples.forEach(sample => {
-            if (!this.articles.find(a => a.id === sample.id)) {
-                this.articles.unshift(sample);
-            }
-        });
-        
-        this.filteredArticles = [...this.articles];
-        this.saveToStorage();
-        this.renderArticles();
-        this.renderTags();
-        
-        alert('示例文章加载成功！');
-        this.switchView('list');
+        try {
+            await this.addSampleArticles();
+            await this.loadFromStorage();
+            this.renderArticles();
+            this.renderTags();
+            
+            this.showToast('示例文章加载成功！', 'success');
+            this.switchView('list');
+        } catch (error) {
+            console.error('加载示例文章失败:', error);
+            this.showToast('加载示例文章失败，请重试', 'error');
+        }
     }
 
     showDeleteModal(id) {
+        if (!this.isAdmin) {
+            this.showToast('请先登录管理员账号！', 'warning');
+            return;
+        }
         this.deletingArticleId = id;
         document.getElementById('delete-modal').classList.add('show');
     }
@@ -556,24 +759,46 @@ On dry days, the same processes lead to "arid" land. In arid regions, the ground
         document.getElementById('delete-modal').classList.remove('show');
     }
 
-    confirmDelete() {
+    async confirmDelete() {
+        if (!this.isAdmin) {
+            this.showToast('请先登录管理员账号！', 'warning');
+            return;
+        }
+        
         if (this.deletingArticleId === null) return;
         
-        this.articles = this.articles.filter(a => a.id != this.deletingArticleId);
-        this.filteredArticles = [...this.articles];
-        this.saveToStorage();
-        this.renderArticles();
-        this.renderTags();
-        
-        this.closeDeleteModal();
-        alert('文章删除成功！');
-        
-        if (document.getElementById('detail-view').classList.contains('active')) {
-            this.switchView('list');
+        try {
+            const articleToDelete = this.articles.find(a => a.id == this.deletingArticleId);
+            if (!articleToDelete || !articleToDelete.objectId) {
+                this.showToast('文章不存在', 'error');
+                return;
+            }
+            
+            const db = app.database();
+            await db.collection('articles').doc(articleToDelete.objectId).remove();
+            
+            await this.loadFromStorage();
+            this.renderArticles();
+            this.renderTags();
+            
+            this.closeDeleteModal();
+            this.showToast('文章删除成功！', 'success');
+            
+            if (document.getElementById('detail-view').classList.contains('active')) {
+                this.switchView('list');
+            }
+        } catch (error) {
+            console.error('删除文章失败:', error);
+            this.showToast('删除文章失败，请重试', 'error');
         }
     }
 
     showEditModal(id) {
+        if (!this.isAdmin) {
+            this.showToast('请先登录管理员账号！', 'warning');
+            return;
+        }
+        
         const article = this.articles.find(a => a.id == id);
         if (!article) return;
         
@@ -593,7 +818,12 @@ On dry days, the same processes lead to "arid" land. In arid regions, the ground
         document.getElementById('edit-modal').classList.remove('show');
     }
 
-    saveEdit() {
+    async saveEdit() {
+        if (!this.isAdmin) {
+            this.showToast('请先登录管理员账号！', 'warning');
+            return;
+        }
+        
         if (this.editingArticleId === null) return;
         
         const title = document.getElementById('edit-title').value.trim();
@@ -603,32 +833,39 @@ On dry days, the same processes lead to "arid" land. In arid regions, the ground
         const chinese = document.getElementById('edit-chinese').value.trim();
         
         if (!title || !english || !chinese) {
-            alert('请填写完整信息！');
+            this.showToast('请填写完整信息！', 'error');
             return;
         }
         
-        const index = this.articles.findIndex(a => a.id == this.editingArticleId);
-        if (index !== -1) {
-            this.articles[index] = {
-                ...this.articles[index],
-                title,
-                english,
-                chinese,
+        try {
+            const articleToEdit = this.articles.find(a => a.id == this.editingArticleId);
+            if (!articleToEdit || !articleToEdit.objectId) {
+                this.showToast('文章不存在', 'error');
+                return;
+            }
+            
+            const db = app.database();
+            await db.collection('articles').doc(articleToEdit.objectId).update({
+                title: title,
+                english: english,
+                chinese: chinese,
                 tags: tags.length ? tags : ['未分类'],
-                level
-            };
-        }
-        
-        this.filteredArticles = [...this.articles];
-        this.saveToStorage();
-        this.renderArticles();
-        this.renderTags();
-        
-        this.closeEditModal();
-        alert('文章编辑成功！');
-        
-        if (document.getElementById('detail-view').classList.contains('active')) {
-            this.showArticleDetail(this.editingArticleId);
+                level: level
+            });
+            
+            await this.loadFromStorage();
+            this.renderArticles();
+            this.renderTags();
+            
+            this.closeEditModal();
+            this.showToast('文章编辑成功！', 'success');
+            
+            if (document.getElementById('detail-view').classList.contains('active')) {
+                this.showArticleDetail(this.editingArticleId);
+            }
+        } catch (error) {
+            console.error('编辑文章失败:', error);
+            this.showToast('编辑文章失败，请重试', 'error');
         }
     }
 }
