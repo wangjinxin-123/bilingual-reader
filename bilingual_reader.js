@@ -1,0 +1,638 @@
+class BilingualReader {
+    constructor() {
+        this.articles = [];
+        this.filteredArticles = [];
+        this.activeTag = null;
+        this.searchQuery = '';
+        this.deletingArticleId = null;
+        this.editingArticleId = null;
+        this.init();
+    }
+
+    init() {
+        this.loadFromStorage();
+        this.bindEvents();
+        this.renderArticles();
+        this.renderTags();
+        this.initStreaks();
+    }
+
+    initStreaks() {
+        const container = document.getElementById('bg-streaks-container');
+        if (!container) return;
+
+        const createStreak = () => {
+            const streak = document.createElement('div');
+            streak.className = 'dynamic-streak';
+            
+            const angle = Math.random() * 360;
+            const length = 80 + Math.random() * 200;
+            const duration = 1 + Math.random() * 2;
+            const delay = Math.random() * 0.8;
+            const translateX1 = 100 + Math.random() * 200;
+            const translateX2 = 300 + Math.random() * 500;
+            const opacityPeak = 0.4 + Math.random() * 0.6;
+            
+            const centerX = window.innerWidth / 2;
+            const centerY = window.innerHeight / 2;
+            
+            streak.style.cssText = `
+                position: absolute;
+                left: ${centerX}px;
+                top: ${centerY}px;
+                width: ${length}px;
+                height: ${1 + Math.random() * 2}px;
+                background: linear-gradient(90deg, 
+                    transparent 0%, 
+                    rgba(125, 211, 252, ${0.1 + Math.random() * 0.3}) 20%, 
+                    rgba(125, 211, 252, ${0.4 + Math.random() * 0.4}) 40%,
+                    rgba(192, 132, 252, ${0.3 + Math.random() * 0.3}) 60%,
+                    rgba(240, 171, 252, ${0.2 + Math.random() * 0.2}) 80%,
+                    transparent 100%);
+                transform: rotate(${angle}deg) translateX(0);
+                transform-origin: left center;
+                opacity: 0;
+                pointer-events: none;
+            `;
+            
+            container.appendChild(streak);
+            
+            const startTime = Date.now() + delay * 1000;
+            
+            const animate = () => {
+                const elapsed = Date.now() - startTime;
+                const progress = Math.min(elapsed / (duration * 1000), 1);
+                
+                if (progress >= 1) {
+                    streak.remove();
+                    return;
+                }
+                
+                let opacity = 0;
+                let translateX = 0;
+                let scaleX = 0;
+                
+                if (progress < 0.2) {
+                    opacity = (progress / 0.2) * opacityPeak;
+                    scaleX = progress / 0.2;
+                    translateX = 0;
+                } else if (progress < 0.6) {
+                    const t = (progress - 0.2) / 0.4;
+                    opacity = opacityPeak - t * (opacityPeak * 0.4);
+                    translateX = t * translateX1;
+                    scaleX = 1;
+                } else if (progress < 0.8) {
+                    const t = (progress - 0.6) / 0.2;
+                    opacity = opacityPeak * 0.6 - t * (opacityPeak * 0.5);
+                    translateX = translateX1 + t * (translateX2 - translateX1);
+                    scaleX = 1 - t * 0.3;
+                } else {
+                    const t = (progress - 0.8) / 0.2;
+                    opacity = opacityPeak * 0.1 - t * (opacityPeak * 0.1);
+                    translateX = translateX2;
+                    scaleX = 0.7 - t * 0.7;
+                }
+                
+                if (Math.random() > 0.85) {
+                    opacity *= 0.3;
+                } else if (Math.random() > 0.7) {
+                    opacity *= 0.7;
+                }
+                
+                streak.style.opacity = Math.max(0, opacity);
+                streak.style.transform = `rotate(${angle}deg) translateX(${translateX}px) scaleX(${Math.max(0, scaleX)})`;
+                
+                requestAnimationFrame(animate);
+            };
+            
+            if (delay > 0) {
+                setTimeout(() => requestAnimationFrame(animate), delay * 1000);
+            } else {
+                requestAnimationFrame(animate);
+            }
+        };
+
+        const createBatch = () => {
+            const count = 2 + Math.floor(Math.random() * 6);
+            for (let i = 0; i < count; i++) {
+                setTimeout(() => createStreak(), i * 80 + Math.random() * 150);
+            }
+        };
+
+        createBatch();
+        setInterval(() => {
+            createBatch();
+        }, 500 + Math.random() * 800);
+    }
+
+    loadFromStorage() {
+        const stored = localStorage.getItem('bilingual_articles');
+        if (stored) {
+            this.articles = JSON.parse(stored);
+        } else {
+            this.articles = this.getSampleArticles();
+            this.saveToStorage();
+        }
+        this.filteredArticles = [...this.articles];
+    }
+
+    saveToStorage() {
+        localStorage.setItem('bilingual_articles', JSON.stringify(this.articles));
+    }
+
+    getSampleArticles() {
+        return [
+            {
+                id: 1,
+                title: "Climate and Earth Systems",
+                english: `To understand climate, we must look at the "horizon" of the whole Earth system. Over the "globe", the "ocean" and "marine" regions affect the air. The "current" inside the ocean may flow like a "stream" or a "torrent", moving heat and influencing the atmosphere. Sea "tide" and "source" water also matter. Warm water can produce "evaporation", turning liquid into "vapour". That vapour then "circulates" through the air and eventually "precipitate"s as rain.
+
+On dry days, the same processes lead to "arid" land. In arid regions, the ground lacks "moist" air and becomes "dry" or "damp" depending on season. When the air is "humid", clouds grow thicker and the sky becomes "stormy". Many storms begin with "gust" winds, then turn into "gale", and later become "hurricane" or even "tornado". In extreme cases, a "catastrophic" event may endanger communities.`,
+                chinese: `要理解气候，我们必须从整个地球系统的"视野"来观察。在"全球"范围内，"海洋"和"海洋"区域影响着大气。海洋内部的"洋流"可能像"溪流"或"激流"一样流动，输送热量并影响大气。海洋"潮汐"和"源头"水也很重要。温暖的水会产生"蒸发"，将液体转化为"蒸汽"。然后，这些蒸汽在空气中"循环"，最终以降水的形式"沉降"为雨。
+
+在干燥的日子里，同样的过程也会导致"干旱"的土地。在干旱地区，地面缺少"湿润"的空气，因此可能变得干燥，或在不同季节呈现"潮湿"。当空气"潮湿"时，云层会变厚，天空会变得"暴风雨"。许多风暴从"阵风"开始，随后发展成"大风"，再进一步变成"飓风"，甚至演变为"龙卷风"。在极端情况下，一个"灾难性的"事件可能会危及社区。`,
+                tags: ["自然", "地理", "气候"],
+                level: "intermediate",
+                date: "2024-01-15"
+            },
+            {
+                id: 2,
+                title: "The Art of Slow Living",
+                english: "In a world that constantly pushes us to move faster, do more, and achieve greater heights, there's a growing movement towards slow living. This philosophy encourages us to savor each moment, find joy in simplicity, and cultivate mindfulness in our daily lives.\n\nSlow living is not about being unproductive or lazy; rather, it's about intentionality. It's about focusing on what truly matters, eliminating unnecessary busyness, and creating space for the things that bring us genuine happiness and fulfillment.",
+                chinese: "在一个不断推动我们更快前进、做得更多、追求更高成就的世界里，慢生活的运动正在兴起。这种哲学鼓励我们品味每一个时刻，在简单中寻找快乐，并在日常生活中培养正念。\n\n慢生活并不是指不高效或懒惰；相反，它是关于 intentionality（ intentionality）。它是关于专注于真正重要的事情，消除不必要的忙碌，为那些给我们带来真正快乐和满足感的事情创造空间。",
+                tags: ["生活", "哲学", "健康"],
+                level: "beginner",
+                date: "2024-01-10"
+            },
+            {
+                id: 3,
+                title: "Climate Change: A Call to Action",
+                english: "Climate change is one of the most pressing issues of our time, affecting every corner of the globe. The scientific evidence is clear: human activities are fundamentally altering our planet's climate system, with far-reaching consequences for ecosystems, economies, and human well-being.\n\nThe impacts of climate change are already evident. Rising global temperatures, extreme weather events, melting ice caps, and sea-level rise are just a few of the changes we're witnessing.",
+                chinese: "气候变化是我们这个时代最紧迫的问题之一，影响着全球的每一个角落。科学证据是明确的：人类活动正在从根本上改变我们星球的气候系统，对生态系统、经济和人类福祉产生深远的影响。\n\n气候变化的影响已经显而易见。全球气温上升、极端天气事件、冰盖融化和海平面上升只是我们正在目睹的一些变化。",
+                tags: ["环境", "气候", "可持续"],
+                level: "intermediate",
+                date: "2024-01-05"
+            }
+        ];
+    }
+
+    bindEvents() {
+        document.querySelectorAll('.nav-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                this.switchView(e.target.dataset.view);
+            });
+        });
+
+        document.getElementById('search-input').addEventListener('input', (e) => {
+            this.searchQuery = e.target.value.toLowerCase();
+            this.filterArticles();
+        });
+
+        document.getElementById('upload-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.addArticle();
+        });
+
+        document.getElementById('btn-batch').addEventListener('click', () => {
+            this.loadBatchSamples();
+        });
+
+        document.getElementById('back-btn').addEventListener('click', () => {
+            this.switchView('list');
+        });
+
+        document.getElementById('modal-cancel').addEventListener('click', () => {
+            this.closeDeleteModal();
+        });
+
+        document.getElementById('modal-confirm').addEventListener('click', () => {
+            this.confirmDelete();
+        });
+
+        document.getElementById('edit-modal-cancel').addEventListener('click', () => {
+            this.closeEditModal();
+        });
+
+        document.getElementById('edit-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.saveEdit();
+        });
+
+        document.getElementById('delete-modal').addEventListener('click', (e) => {
+            if (e.target.id === 'delete-modal') {
+                this.closeDeleteModal();
+            }
+        });
+
+        document.getElementById('edit-modal').addEventListener('click', (e) => {
+            if (e.target.id === 'edit-modal') {
+                this.closeEditModal();
+            }
+        });
+
+        document.getElementById('modal-close-btn').addEventListener('click', () => {
+            this.closeArticleModal();
+        });
+
+        document.getElementById('article-modal-overlay').addEventListener('click', (e) => {
+            if (e.target.id === 'article-modal-overlay') {
+                this.closeArticleModal();
+            }
+        });
+    }
+
+    switchView(view) {
+        document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelector(`[data-view="${view}"]`).classList.add('active');
+        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+        document.getElementById(`${view}-view`).classList.add('active');
+    }
+
+    getAllTags() {
+        const tags = new Set();
+        this.articles.forEach(article => {
+            if (article.tags && Array.isArray(article.tags)) {
+                article.tags.forEach(tag => tags.add(tag));
+            }
+        });
+        return Array.from(tags);
+    }
+
+    renderTags() {
+        const tagsContainer = document.getElementById('tags-filter');
+        const tags = this.getAllTags();
+        
+        tagsContainer.innerHTML = '';
+        
+        const allBtn = document.createElement('button');
+        allBtn.className = 'tag-btn' + (!this.activeTag ? ' active' : '');
+        allBtn.textContent = '全部';
+        allBtn.addEventListener('click', () => {
+            this.activeTag = null;
+            this.filterArticles();
+            this.renderTags();
+        });
+        tagsContainer.appendChild(allBtn);
+        
+        tags.forEach(tag => {
+            const btn = document.createElement('button');
+            btn.className = 'tag-btn' + (this.activeTag === tag ? ' active' : '');
+            btn.textContent = tag;
+            btn.addEventListener('click', () => {
+                this.activeTag = tag;
+                this.filterArticles();
+                this.renderTags();
+            });
+            tagsContainer.appendChild(btn);
+        });
+    }
+
+    filterArticles() {
+        this.filteredArticles = this.articles.filter(article => {
+            const matchesSearch = !this.searchQuery || 
+                article.title.toLowerCase().includes(this.searchQuery) ||
+                (article.english && article.english.toLowerCase().includes(this.searchQuery)) ||
+                (article.chinese && article.chinese.includes(this.searchQuery)) ||
+                (article.tags && article.tags.some(tag => tag.toLowerCase().includes(this.searchQuery)));
+            
+            const matchesTag = !this.activeTag || (article.tags && article.tags.includes(this.activeTag));
+            
+            return matchesSearch && matchesTag;
+        });
+        
+        this.renderArticles();
+    }
+
+    renderArticles() {
+        const grid = document.getElementById('articles-grid');
+        const emptyState = document.getElementById('empty-state');
+        
+        if (this.filteredArticles.length === 0) {
+            grid.innerHTML = '';
+            emptyState.classList.add('show');
+            return;
+        }
+        
+        emptyState.classList.remove('show');
+        grid.innerHTML = this.filteredArticles.map(article => this.createArticleCard(article)).join('');
+        
+        grid.querySelectorAll('.article-card').forEach(card => {
+            card.addEventListener('click', (e) => {
+                if (!e.target.closest('.card-actions')) {
+                    this.showArticleModal(card.dataset.id);
+                }
+            });
+        });
+
+        grid.querySelectorAll('.card-action-btn.delete').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.showDeleteModal(btn.closest('.article-card').dataset.id);
+            });
+        });
+
+        grid.querySelectorAll('.card-action-btn.edit').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.showEditModal(btn.closest('.article-card').dataset.id);
+            });
+        });
+    }
+
+    createArticleCard(article) {
+        const levelLabels = {
+            beginner: '入门级',
+            intermediate: '中级',
+            advanced: '高级'
+        };
+        
+        return `
+            <div class="article-card" data-id="${article.id}">
+                <div class="card-header">
+                    <h2 class="card-title">${article.title}</h2>
+                    <div class="card-actions">
+                        <button class="card-action-btn edit" title="编辑">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                            </svg>
+                        </button>
+                        <button class="card-action-btn delete" title="删除">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                                <path d="M3 6h18"></path>
+                                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <span class="card-level ${article.level}">${levelLabels[article.level] || '中级'}</span>
+                <p class="card-preview">${article.english ? article.english.substring(0, 150) : ''}...</p>
+                <div class="card-tags">
+                    ${article.tags ? article.tags.map(tag => `<span class="card-tag">${tag}</span>`).join('') : ''}
+                </div>
+                <div class="card-meta">
+                    <span>${article.date || ''}</span>
+                    <span>${article.english ? this.countWords(article.english) : 0} words</span>
+                </div>
+            </div>
+        `;
+    }
+
+    countWords(text) {
+        return text.split(/\s+/).filter(word => word.length > 0).length;
+    }
+
+    showArticleDetail(id) {
+        const article = this.articles.find(a => a.id == id);
+        if (!article) return;
+        
+        const levelLabels = {
+            beginner: '入门级',
+            intermediate: '中级',
+            advanced: '高级'
+        };
+        
+        const enParagraphs = article.english.split('\n\n').filter(p => p.trim());
+        const zhParagraphs = article.chinese.split('\n\n').filter(p => p.trim());
+        
+        const pairs = enParagraphs.map((en, i) => ({
+            en,
+            zh: zhParagraphs[i] || ''
+        }));
+        
+        document.getElementById('article-detail').innerHTML = `
+            <div class="detail-header">
+                <h1 class="detail-title">${article.title}</h1>
+                <div class="detail-actions">
+                    <button class="detail-action-btn edit" data-id="${article.id}">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                        </svg>
+                        编辑
+                    </button>
+                    <button class="detail-action-btn delete" data-id="${article.id}">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                            <path d="M3 6h18"></path>
+                            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                        </svg>
+                        删除
+                    </button>
+                </div>
+            </div>
+            <div class="detail-meta">
+                <span class="detail-level ${article.level}">${levelLabels[article.level] || '中级'}</span>
+                <div class="detail-tags">
+                    ${article.tags ? article.tags.map(tag => `<span class="detail-tag">${tag}</span>`).join('') : ''}
+                </div>
+            </div>
+            <div class="article-content">
+                ${pairs.map(pair => `
+                    <div class="paragraph-pair">
+                        <p class="paragraph-en">${pair.en}</p>
+                        <p class="paragraph-zh">${pair.zh}</p>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+
+        document.querySelector('.detail-action-btn.edit').addEventListener('click', () => {
+            this.showEditModal(article.id);
+        });
+
+        document.querySelector('.detail-action-btn.delete').addEventListener('click', () => {
+            this.showDeleteModal(article.id);
+        });
+        
+        this.switchView('detail');
+    }
+
+    showArticleModal(id) {
+        const article = this.articles.find(a => a.id == id);
+        if (!article) return;
+        
+        const levelLabels = {
+            beginner: '入门级',
+            intermediate: '中级',
+            advanced: '高级'
+        };
+        
+        const enContent = article.english.replace(/\n\n/g, ' ').trim();
+        const zhContent = article.chinese.replace(/\n\n/g, ' ').trim();
+        
+        document.getElementById('modal-content').innerHTML = `
+            <h1 class="detail-title">${article.title}</h1>
+            <div class="detail-meta">
+                <span class="detail-level ${article.level}">${levelLabels[article.level] || '中级'}</span>
+                <div class="detail-tags">
+                    ${article.tags ? article.tags.map(tag => `<span class="detail-tag">${tag}</span>`).join('') : ''}
+                </div>
+            </div>
+            <div class="article-content">
+                <div class="columns-header">
+                    <div class="column-title">English</div>
+                    <div class="column-title">中文译文</div>
+                </div>
+                <div class="paragraph-pair">
+                    <p class="paragraph-en">${enContent}</p>
+                    <p class="paragraph-zh">${zhContent}</p>
+                </div>
+            </div>
+        `;
+        
+        document.getElementById('article-modal-overlay').classList.add('show');
+        document.body.style.overflow = 'hidden';
+    }
+
+    closeArticleModal() {
+        document.getElementById('article-modal-overlay').classList.remove('show');
+        document.body.style.overflow = '';
+    }
+
+    addArticle() {
+        const title = document.getElementById('article-title').value.trim();
+        const tags = document.getElementById('article-tags').value.split(',').map(t => t.trim()).filter(t => t);
+        const level = document.getElementById('article-level').value;
+        const english = document.getElementById('article-english').value.trim();
+        const chinese = document.getElementById('article-chinese').value.trim();
+        
+        if (!title || !english || !chinese) {
+            alert('请填写完整信息！');
+            return;
+        }
+        
+        const newArticle = {
+            id: Date.now(),
+            title,
+            english,
+            chinese,
+            tags: tags.length ? tags : ['未分类'],
+            level,
+            date: new Date().toISOString().split('T')[0]
+        };
+        
+        this.articles.unshift(newArticle);
+        this.filteredArticles = [...this.articles];
+        this.saveToStorage();
+        this.renderArticles();
+        this.renderTags();
+        
+        document.getElementById('upload-form').reset();
+        alert('文章添加成功！');
+        this.switchView('list');
+    }
+
+    loadBatchSamples() {
+        if (this.articles.length > 3) {
+            alert('示例文章已加载！');
+            return;
+        }
+
+        const samples = this.getSampleArticles();
+        samples.forEach(sample => {
+            if (!this.articles.find(a => a.id === sample.id)) {
+                this.articles.unshift(sample);
+            }
+        });
+        
+        this.filteredArticles = [...this.articles];
+        this.saveToStorage();
+        this.renderArticles();
+        this.renderTags();
+        
+        alert('示例文章加载成功！');
+        this.switchView('list');
+    }
+
+    showDeleteModal(id) {
+        this.deletingArticleId = id;
+        document.getElementById('delete-modal').classList.add('show');
+    }
+
+    closeDeleteModal() {
+        this.deletingArticleId = null;
+        document.getElementById('delete-modal').classList.remove('show');
+    }
+
+    confirmDelete() {
+        if (this.deletingArticleId === null) return;
+        
+        this.articles = this.articles.filter(a => a.id != this.deletingArticleId);
+        this.filteredArticles = [...this.articles];
+        this.saveToStorage();
+        this.renderArticles();
+        this.renderTags();
+        
+        this.closeDeleteModal();
+        alert('文章删除成功！');
+        
+        if (document.getElementById('detail-view').classList.contains('active')) {
+            this.switchView('list');
+        }
+    }
+
+    showEditModal(id) {
+        const article = this.articles.find(a => a.id == id);
+        if (!article) return;
+        
+        this.editingArticleId = id;
+        
+        document.getElementById('edit-title').value = article.title;
+        document.getElementById('edit-tags').value = article.tags ? article.tags.join(', ') : '';
+        document.getElementById('edit-level').value = article.level;
+        document.getElementById('edit-english').value = article.english;
+        document.getElementById('edit-chinese').value = article.chinese;
+        
+        document.getElementById('edit-modal').classList.add('show');
+    }
+
+    closeEditModal() {
+        this.editingArticleId = null;
+        document.getElementById('edit-modal').classList.remove('show');
+    }
+
+    saveEdit() {
+        if (this.editingArticleId === null) return;
+        
+        const title = document.getElementById('edit-title').value.trim();
+        const tags = document.getElementById('edit-tags').value.split(',').map(t => t.trim()).filter(t => t);
+        const level = document.getElementById('edit-level').value;
+        const english = document.getElementById('edit-english').value.trim();
+        const chinese = document.getElementById('edit-chinese').value.trim();
+        
+        if (!title || !english || !chinese) {
+            alert('请填写完整信息！');
+            return;
+        }
+        
+        const index = this.articles.findIndex(a => a.id == this.editingArticleId);
+        if (index !== -1) {
+            this.articles[index] = {
+                ...this.articles[index],
+                title,
+                english,
+                chinese,
+                tags: tags.length ? tags : ['未分类'],
+                level
+            };
+        }
+        
+        this.filteredArticles = [...this.articles];
+        this.saveToStorage();
+        this.renderArticles();
+        this.renderTags();
+        
+        this.closeEditModal();
+        alert('文章编辑成功！');
+        
+        if (document.getElementById('detail-view').classList.contains('active')) {
+            this.showArticleDetail(this.editingArticleId);
+        }
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    new BilingualReader();
+});
