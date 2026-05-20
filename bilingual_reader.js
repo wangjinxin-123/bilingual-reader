@@ -1,12 +1,17 @@
 const ADMIN_KEY = '323157';
 
-// ⚠️ 请替换为你自己的腾讯云开发配置
-const tcbConfig = {
-    env: 'bilingual-reader-d2emwnwecc8dfea6'  // 替换为你的环境 ID
+// Firebase 配置 - 请在 https://console.firebase.google.com 中创建项目后替换为自己的配置
+const firebaseConfig = {
+    apiKey: "AIzaSyCw4wJ5Nc2r9x8T2zK8XfWx9Yd8QzXwJx5s",
+    authDomain: "bilingual-reader-app.firebaseapp.com",
+    projectId: "bilingual-reader-app",
+    storageBucket: "bilingual-reader-app.appspot.com",
+    messagingSenderId: "123456789012",
+    appId: "1:123456789012:web:abc123def4567890abc12"
 };
 
-// 初始化腾讯云开发
-const app = tcb.init(tcbConfig);
+// 初始化 Firebase
+let firebaseApp, firestoreDb;
 
 class BilingualReader {
     constructor() {
@@ -17,17 +22,48 @@ class BilingualReader {
         this.deletingArticleId = null;
         this.editingArticleId = null;
         this.isAdmin = false;
+        this.dbReady = false;
         this.init();
     }
 
     async init() {
-        await this.loadFromStorage();
-        this.checkAdminStatus();
-        this.bindEvents();
-        this.renderArticles();
-        this.renderTags();
-        this.initStreaks();
-        this.updateAdminUI();
+        try {
+            await this.initFirebase();
+            await this.loadFromStorage();
+            this.checkAdminStatus();
+            this.bindEvents();
+            this.renderArticles();
+            this.renderTags();
+            this.initStreaks();
+            this.updateAdminUI();
+        } catch (error) {
+            console.error('初始化失败:', error);
+            this.showToast('初始化失败，请检查网络连接和 Firebase 配置', 'error');
+        }
+    }
+
+    async initFirebase() {
+        try {
+            if (typeof firebase === 'undefined') {
+                throw new Error('Firebase SDK 未加载');
+            }
+            
+            if (!firebaseApp) {
+                firebaseApp = firebase.initializeApp(firebaseConfig);
+                firestoreDb = firebase.firestore(firebaseApp);
+                
+                await firestoreDb.collection('articles').limit(1).get();
+                
+                this.dbReady = true;
+                console.log('✅ Firebase 连接成功');
+                this.showToast('已连接到云端数据库', 'success');
+            }
+        } catch (error) {
+            console.error('Firebase 初始化失败:', error);
+            this.showToast('Firebase 连接失败，请检查配置', 'error');
+            this.dbReady = false;
+            throw error;
+        }
     }
 
     showToast(message, type = 'success') {
@@ -195,15 +231,31 @@ class BilingualReader {
 
     async loadFromStorage() {
         try {
-            const db = app.database();
-            const result = await db.collection('articles').orderBy('createdAt', 'desc').get();
-            
-            if (result.data.length === 0) {
+            if (!this.dbReady || !firestoreDb) {
+                throw new Error('数据库未连接');
+            }
+
+            const snapshot = await firestoreDb.collection('articles')
+                .orderBy('createdAt', 'desc')
+                .get();
+
+            if (snapshot.empty) {
+                console.log('数据库为空，添加示例文章');
                 await this.addSampleArticles();
-                const newResult = await db.collection('articles').orderBy('createdAt', 'desc').get();
-                this.articles = newResult.data.map(this.convertToArticle);
+                const newSnapshot = await firestoreDb.collection('articles')
+                    .orderBy('createdAt', 'desc')
+                    .get();
+                this.articles = newSnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    objectId: doc.id,
+                    ...doc.data()
+                }));
             } else {
-                this.articles = result.data.map(this.convertToArticle);
+                this.articles = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    objectId: doc.id,
+                    ...doc.data()
+                }));
             }
             this.filteredArticles = [...this.articles];
         } catch (error) {
@@ -214,41 +266,34 @@ class BilingualReader {
         }
     }
 
-    convertToArticle(record) {
-        return {
-            id: record._id,
-            objectId: record._id,
-            title: record.title,
-            english: record.english,
-            chinese: record.chinese,
-            tags: record.tags || [],
-            level: record.level || 'intermediate',
-            date: record.date || new Date().toISOString().split('T')[0],
-            createdAt: record.createdAt
-        };
-    }
-
     async addSampleArticles() {
+        if (!this.dbReady || !firestoreDb) return;
+
         const samples = this.getSampleArticles();
-        const db = app.database();
-        for (const sample of samples) {
-            await db.collection('articles').add({
-                title: sample.title,
-                english: sample.english,
-                chinese: sample.chinese,
-                tags: sample.tags,
-                level: sample.level,
-                date: sample.date
+        const batch = firestoreDb.batch();
+
+        samples.forEach(sample => {
+            const docRef = firestoreDb.collection('articles').doc();
+            batch.set(docRef, {
+                ...sample,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
-        }
+        });
+
+        await batch.commit();
+        console.log('示例文章已添加');
     }
 
     getSampleArticles() {
         return [
             {
                 title: "Climate and Earth Systems",
-                english: `To understand climate, we must look at the "horizon" of the whole Earth system. Over the "globe", the "ocean" and "marine" regions affect the air. The "current" inside the ocean may flow like a "stream" or a "torrent", moving heat and influencing the atmosphere. Sea "tide" and "source" water also matter. Warm water can produce "evaporation", turning liquid into "vapour". That vapour then "circulates" through the air and eventually "precipitate"s as rain.\n\nOn dry days, the same processes lead to "arid" land. In arid regions, the ground lacks "moist" air and becomes "dry" or "damp" depending on season. When the air is "humid", clouds grow thicker and the sky becomes "stormy". Many storms begin with "gust" winds, then turn into "gale", and later become "hurricane" or even "tornado". In extreme cases, a "catastrophic" event may endanger communities.`,
-                chinese: `要理解气候，我们必须从整个地球系统的"视野"来观察。在"全球"范围内，"海洋"和"海洋"区域影响着大气。海洋内部的"洋流"可能像"溪流"或"激流"一样流动，输送热量并影响大气。海洋"潮汐"和"源头"水也很重要。温暖的水会产生"蒸发"，将液体转化为"蒸汽"。然后，这些蒸汽在空气中"循环"，最终以降水的形式"沉降"为雨。\n\n在干燥的日子里，同样的过程也会导致"干旱"的土地。在干旱地区，地面缺少"湿润"的空气，因此可能变得干燥，或在不同季节呈现"潮湿"。当空气"潮湿"时，云层会变厚，天空会变得"暴风雨"。许多风暴从"阵风"开始，随后发展成"大风"，再进一步变成"飓风"，甚至演变为"龙卷风"。在极端情况下，一个"灾难性的"事件可能会危及社区。`,
+                english: `To understand climate, we must look at the "horizon" of the whole Earth system. Over the "globe", the "ocean" and "marine" regions affect the air. The "current" inside the ocean may flow like a "stream" or a "torrent", moving heat and influencing the atmosphere. Sea "tide" and "source" water also matter. Warm water can produce "evaporation", turning liquid into "vapour". That vapour then "circulates" through the air and eventually "precipitate"s as rain.
+
+On dry days, the same processes lead to "arid" land. In arid regions, the ground lacks "moist" air and becomes "dry" or "damp" depending on season. When the air is "humid", clouds grow thicker and the sky becomes "stormy". Many storms begin with "gust" winds, then turn into "gale", and later become "hurricane" or even "tornado". In extreme cases, a "catastrophic" event may endanger communities.`,
+                chinese: `要理解气候，我们必须从整个地球系统的"视野"来观察。在"全球"范围内，"海洋"和"海洋"区域影响着大气。海洋内部的"洋流"可能像"溪流"或"激流"一样流动，输送热量并影响大气。海洋"潮汐"和"源头"水也很重要。温暖的水会产生"蒸发"，将液体转化为"蒸汽"。然后，这些蒸汽在空气中"循环"，最终以降水的形式"沉降"为雨。
+
+在干燥的日子里，同样的过程也会导致"干旱"的土地。在干旱地区，地面缺少"湿润"的空气，因此可能变得干燥，或在不同季节呈现"潮湿"。当空气"潮湿"时，云层会变厚，天空会变得"暴风雨"。许多风暴从"阵风"开始，随后发展成"大风"，再进一步变成"飓风"，甚至演变为"龙卷风"。在极端情况下，一个"灾难性的"事件可能会危及社区。`,
                 tags: ["自然", "地理", "气候"],
                 level: "intermediate",
                 date: "2024-01-15"
@@ -701,15 +746,20 @@ class BilingualReader {
             return;
         }
         
+        if (!this.dbReady || !firestoreDb) {
+            this.showToast('数据库未连接！', 'error');
+            return;
+        }
+        
         try {
-            const db = app.database();
-            await db.collection('articles').add({
+            await firestoreDb.collection('articles').add({
                 title: title,
                 english: english,
                 chinese: chinese,
                 tags: tags.length ? tags : ['未分类'],
                 level: level,
-                date: new Date().toISOString().split('T')[0]
+                date: new Date().toISOString().split('T')[0],
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
             
             await this.loadFromStorage();
@@ -730,7 +780,7 @@ class BilingualReader {
             this.showToast('请先登录管理员账号！', 'warning');
             return;
         }
-
+        
         try {
             await this.addSampleArticles();
             await this.loadFromStorage();
@@ -768,14 +818,12 @@ class BilingualReader {
         if (this.deletingArticleId === null) return;
         
         try {
-            const articleToDelete = this.articles.find(a => a.id == this.deletingArticleId);
-            if (!articleToDelete || !articleToDelete.objectId) {
-                this.showToast('文章不存在', 'error');
+            if (!this.dbReady || !firestoreDb) {
+                this.showToast('数据库未连接！', 'error');
                 return;
             }
             
-            const db = app.database();
-            await db.collection('articles').doc(articleToDelete.objectId).remove();
+            await firestoreDb.collection('articles').doc(this.deletingArticleId).delete();
             
             await this.loadFromStorage();
             this.renderArticles();
@@ -838,14 +886,12 @@ class BilingualReader {
         }
         
         try {
-            const articleToEdit = this.articles.find(a => a.id == this.editingArticleId);
-            if (!articleToEdit || !articleToEdit.objectId) {
-                this.showToast('文章不存在', 'error');
+            if (!this.dbReady || !firestoreDb) {
+                this.showToast('数据库未连接！', 'error');
                 return;
             }
             
-            const db = app.database();
-            await db.collection('articles').doc(articleToEdit.objectId).update({
+            await firestoreDb.collection('articles').doc(this.editingArticleId).update({
                 title: title,
                 english: english,
                 chinese: chinese,
@@ -871,5 +917,5 @@ class BilingualReader {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    new BilingualReader();
+    window.reader = new BilingualReader();
 });
