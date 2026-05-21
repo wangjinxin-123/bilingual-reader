@@ -954,6 +954,22 @@ body {
     border-bottom: none;
 }
 
+.sent-en, .sent-zh {
+    transition: background-color 0.25s;
+    border-radius: 4px;
+    padding: 1px 0;
+}
+
+.sent-en.highlight {
+    color: #38bdf8;
+    text-shadow: 0 0 12px rgba(125, 211, 252, 0.5), 0 0 24px rgba(125, 211, 252, 0.25);
+}
+
+.sent-zh.highlight {
+    color: #c084fc;
+    text-shadow: 0 0 12px rgba(192, 132, 252, 0.5), 0 0 24px rgba(192, 132, 252, 0.25);
+}
+
 .paragraph-en {
     font-family: var(--font-serif-en);
     font-size: 20px;

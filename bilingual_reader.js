@@ -1,17 +1,11 @@
 const ADMIN_KEY = '323157';
 
-// Firebase 配置 - 请在 https://console.firebase.google.com 中创建项目后替换为自己的配置
-const firebaseConfig = {
-    apiKey: "AIzaSyCw4wJ5Nc2r9x8T2zK8XfWx9Yd8QzXwJx5s",
-    authDomain: "bilingual-reader-app.firebaseapp.com",
-    projectId: "bilingual-reader-app",
-    storageBucket: "bilingual-reader-app.appspot.com",
-    messagingSenderId: "123456789012",
-    appId: "1:123456789012:web:abc123def4567890abc12"
+const cloudbaseConfig = {
+    env: 'bilingual-reader-d2emnwecc8dfea6',
+    region: 'ap-shanghai'
 };
 
-// 初始化 Firebase
-let firebaseApp, firestoreDb;
+let cloudbaseApp = null;
 
 class BilingualReader {
     constructor() {
@@ -22,47 +16,52 @@ class BilingualReader {
         this.deletingArticleId = null;
         this.editingArticleId = null;
         this.isAdmin = false;
-        this.dbReady = false;
         this.init();
     }
 
     async init() {
         try {
-            await this.initFirebase();
+            await this.initCloudbase();
             await this.loadFromStorage();
-            this.checkAdminStatus();
-            this.bindEvents();
-            this.renderArticles();
-            this.renderTags();
-            this.initStreaks();
-            this.updateAdminUI();
         } catch (error) {
-            console.error('初始化失败:', error);
-            this.showToast('初始化失败，请检查网络连接和 Firebase 配置', 'error');
+            console.error('初始化数据失败:', error);
+            this.showToast('数据库连接失败: ' + error.message, 'error');
         }
+
+        this.checkAdminStatus();
+        this.bindEvents();
+        this.renderArticles();
+        this.renderTags();
+        this.initStreaks();
+        this.updateAdminUI();
     }
 
-    async initFirebase() {
+    async initCloudbase() {
+        if (cloudbaseApp) return;
+
+        if (typeof cloudbase === 'undefined') {
+            throw new Error('腾讯云SDK未加载，请检查网络连接');
+        }
+
         try {
-            if (typeof firebase === 'undefined') {
-                throw new Error('Firebase SDK 未加载');
+            registerAuth(cloudbase);
+            registerDatabase(cloudbase);
+
+            cloudbaseApp = cloudbase.init(cloudbaseConfig);
+
+            const { data, error } = await cloudbaseApp.auth.signInAnonymously();
+            if (error) {
+                throw new Error(error.message);
             }
-            
-            if (!firebaseApp) {
-                firebaseApp = firebase.initializeApp(firebaseConfig);
-                firestoreDb = firebase.firestore(firebaseApp);
-                
-                await firestoreDb.collection('articles').limit(1).get();
-                
-                this.dbReady = true;
-                console.log('✅ Firebase 连接成功');
-                this.showToast('已连接到云端数据库', 'success');
-            }
+
+            const db = cloudbaseApp.database();
+
+            const result = await db.collection('articles').limit(1).get();
+            console.log('腾讯云数据库连接成功, 已存在文档数:', result.data.length);
+            this.showToast('已连接到腾讯云数据库', 'success');
         } catch (error) {
-            console.error('Firebase 初始化失败:', error);
-            this.showToast('Firebase 连接失败，请检查配置', 'error');
-            this.dbReady = false;
-            throw error;
+            cloudbaseApp = null;
+            throw new Error('无法连接到腾讯云: ' + error.message);
         }
     }
 
@@ -70,18 +69,18 @@ class BilingualReader {
         const container = document.getElementById('toast-container');
         const toast = document.createElement('div');
         toast.className = `toast ${type}`;
-        
+
         let icon = '✓';
         if (type === 'error') icon = '✕';
         if (type === 'warning') icon = '⚠';
-        
+
         toast.innerHTML = `
             <span class="toast-icon">${icon}</span>
             <span class="toast-content">${message}</span>
         `;
-        
+
         container.appendChild(toast);
-        
+
         setTimeout(() => {
             toast.style.animation = 'toastSlideOut 0.3s cubic-bezier(0.7, 0, 0.84, 0) forwards';
             setTimeout(() => toast.remove(), 300);
@@ -109,7 +108,7 @@ class BilingualReader {
     updateAdminUI() {
         const adminBtn = document.getElementById('admin-btn');
         const uploadBtn = document.getElementById('upload-btn');
-        
+
         if (this.isAdmin) {
             adminBtn.textContent = '管理员已登录';
             adminBtn.style.backgroundColor = '#10b981';
@@ -128,7 +127,7 @@ class BilingualReader {
         const createStreak = () => {
             const streak = document.createElement('div');
             streak.className = 'dynamic-streak';
-            
+
             const angle = Math.random() * 360;
             const length = 80 + Math.random() * 200;
             const duration = 1 + Math.random() * 2;
@@ -136,19 +135,19 @@ class BilingualReader {
             const translateX1 = 100 + Math.random() * 200;
             const translateX2 = 300 + Math.random() * 500;
             const opacityPeak = 0.4 + Math.random() * 0.6;
-            
+
             const centerX = window.innerWidth / 2;
             const centerY = window.innerHeight / 2;
-            
+
             streak.style.cssText = `
                 position: absolute;
                 left: ${centerX}px;
                 top: ${centerY}px;
                 width: ${length}px;
                 height: ${1 + Math.random() * 2}px;
-                background: linear-gradient(90deg, 
-                    transparent 0%, 
-                    rgba(125, 211, 252, ${0.1 + Math.random() * 0.3}) 20%, 
+                background: linear-gradient(90deg,
+                    transparent 0%,
+                    rgba(125, 211, 252, ${0.1 + Math.random() * 0.3}) 20%,
                     rgba(125, 211, 252, ${0.4 + Math.random() * 0.4}) 40%,
                     rgba(192, 132, 252, ${0.3 + Math.random() * 0.3}) 60%,
                     rgba(240, 171, 252, ${0.2 + Math.random() * 0.2}) 80%,
@@ -158,24 +157,24 @@ class BilingualReader {
                 opacity: 0;
                 pointer-events: none;
             `;
-            
+
             container.appendChild(streak);
-            
+
             const startTime = Date.now() + delay * 1000;
-            
+
             const animate = () => {
                 const elapsed = Date.now() - startTime;
                 const progress = Math.min(elapsed / (duration * 1000), 1);
-                
+
                 if (progress >= 1) {
                     streak.remove();
                     return;
                 }
-                
+
                 let opacity = 0;
                 let translateX = 0;
                 let scaleX = 0;
-                
+
                 if (progress < 0.2) {
                     opacity = (progress / 0.2) * opacityPeak;
                     scaleX = progress / 0.2;
@@ -196,19 +195,19 @@ class BilingualReader {
                     translateX = translateX2;
                     scaleX = 0.7 - t * 0.7;
                 }
-                
+
                 if (Math.random() > 0.85) {
                     opacity *= 0.3;
                 } else if (Math.random() > 0.7) {
                     opacity *= 0.7;
                 }
-                
+
                 streak.style.opacity = Math.max(0, opacity);
                 streak.style.transform = `rotate(${angle}deg) translateX(${translateX}px) scaleX(${Math.max(0, scaleX)})`;
-                
+
                 requestAnimationFrame(animate);
             };
-            
+
             if (delay > 0) {
                 setTimeout(() => requestAnimationFrame(animate), delay * 1000);
             } else {
@@ -229,71 +228,70 @@ class BilingualReader {
         }, 500 + Math.random() * 800);
     }
 
+    async getDb() {
+        if (!cloudbaseApp) {
+            await this.initCloudbase();
+        }
+        return cloudbaseApp.database();
+    }
+
     async loadFromStorage() {
         try {
-            if (!this.dbReady || !firestoreDb) {
-                throw new Error('数据库未连接');
-            }
+            const db = await this.getDb();
+            const result = await db.collection('articles').orderBy('createdAt', 'desc').get();
 
-            const snapshot = await firestoreDb.collection('articles')
-                .orderBy('createdAt', 'desc')
-                .get();
-
-            if (snapshot.empty) {
-                console.log('数据库为空，添加示例文章');
+            if (result.data.length === 0) {
                 await this.addSampleArticles();
-                const newSnapshot = await firestoreDb.collection('articles')
-                    .orderBy('createdAt', 'desc')
-                    .get();
-                this.articles = newSnapshot.docs.map(doc => ({
-                    id: doc.id,
-                    objectId: doc.id,
-                    ...doc.data()
-                }));
+                const newResult = await db.collection('articles').orderBy('createdAt', 'desc').get();
+                this.articles = newResult.data.map(r => this.convertToArticle(r));
             } else {
-                this.articles = snapshot.docs.map(doc => ({
-                    id: doc.id,
-                    objectId: doc.id,
-                    ...doc.data()
-                }));
+                this.articles = result.data.map(r => this.convertToArticle(r));
             }
+
             this.filteredArticles = [...this.articles];
         } catch (error) {
-            console.error('加载数据失败:', error);
-            this.showToast('加载数据失败，请检查网络连接', 'error');
+            console.error('加载文章失败:', error);
+            this.showToast('加载文章失败: ' + error.message, 'error');
             this.articles = [];
             this.filteredArticles = [];
         }
     }
 
+    convertToArticle(record) {
+        return {
+            id: record._id,
+            objectId: record._id,
+            title: record.title,
+            english: record.english,
+            chinese: record.chinese,
+            tags: record.tags || [],
+            level: record.level || 'intermediate',
+            date: record.date || new Date().toISOString().split('T')[0],
+            createdAt: record.createdAt
+        };
+    }
+
     async addSampleArticles() {
-        if (!this.dbReady || !firestoreDb) return;
-
         const samples = this.getSampleArticles();
-        const batch = firestoreDb.batch();
-
-        samples.forEach(sample => {
-            const docRef = firestoreDb.collection('articles').doc();
-            batch.set(docRef, {
-                ...sample,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        const db = await this.getDb();
+        for (const sample of samples) {
+            await db.collection('articles').add({
+                title: sample.title,
+                english: sample.english,
+                chinese: sample.chinese,
+                tags: sample.tags,
+                level: sample.level,
+                date: sample.date
             });
-        });
-
-        await batch.commit();
-        console.log('示例文章已添加');
+        }
     }
 
     getSampleArticles() {
         return [
             {
                 title: "Climate and Earth Systems",
-                english: `To understand climate, we must look at the "horizon" of the whole Earth system. Over the "globe", the "ocean" and "marine" regions affect the air. The "current" inside the ocean may flow like a "stream" or a "torrent", moving heat and influencing the atmosphere. Sea "tide" and "source" water also matter. Warm water can produce "evaporation", turning liquid into "vapour". That vapour then "circulates" through the air and eventually "precipitate"s as rain.
-
-On dry days, the same processes lead to "arid" land. In arid regions, the ground lacks "moist" air and becomes "dry" or "damp" depending on season. When the air is "humid", clouds grow thicker and the sky becomes "stormy". Many storms begin with "gust" winds, then turn into "gale", and later become "hurricane" or even "tornado". In extreme cases, a "catastrophic" event may endanger communities.`,
-                chinese: `要理解气候，我们必须从整个地球系统的"视野"来观察。在"全球"范围内，"海洋"和"海洋"区域影响着大气。海洋内部的"洋流"可能像"溪流"或"激流"一样流动，输送热量并影响大气。海洋"潮汐"和"源头"水也很重要。温暖的水会产生"蒸发"，将液体转化为"蒸汽"。然后，这些蒸汽在空气中"循环"，最终以降水的形式"沉降"为雨。
-
-在干燥的日子里，同样的过程也会导致"干旱"的土地。在干旱地区，地面缺少"湿润"的空气，因此可能变得干燥，或在不同季节呈现"潮湿"。当空气"潮湿"时，云层会变厚，天空会变得"暴风雨"。许多风暴从"阵风"开始，随后发展成"大风"，再进一步变成"飓风"，甚至演变为"龙卷风"。在极端情况下，一个"灾难性的"事件可能会危及社区。`,
+                english: `To understand climate, we must look at the "horizon" of the whole Earth system. Over the "globe", the "ocean" and "marine" regions affect the air. The "current" inside the ocean may flow like a "stream" or a "torrent", moving heat and influencing the atmosphere. Sea "tide" and "source" water also matter. Warm water can produce "evaporation", turning liquid into "vapour". That vapour then "circulates" through the air and eventually "precipitate"s as rain.\n\nOn dry days, the same processes lead to "arid" land. In arid regions, the ground lacks "moist" air and becomes "dry" or "damp" depending on season. When the air is "humid", clouds grow thicker and the sky becomes "stormy". Many storms begin with "gust" winds, then turn into "gale", and later become "hurricane" or even "tornado". In extreme cases, a "catastrophic" event may endanger communities.`,
+                chinese: `要理解气候，我们必须从整个地球系统的"视野"来观察。在"全球"范围内，"海洋"和"海洋"区域影响着大气。海洋内部的"洋流"可能像"溪流"或"激流"一样流动，输送热量并影响大气。海洋"潮汐"和"源头"水也很重要。温暖的水会产生"蒸发"，将液体转化为"蒸汽"。然后，这些蒸汽在空气中"循环"，最终以降水的形式"沉降"为雨。\n\n在干燥的日子里，同样的过程也会导致"干旱"的土地。在干旱地区，地面缺少"湿润"的空气，因此可能变得干燥，或在不同季节呈现"潮湿"。当空气"潮湿"时，云层会变厚，天空会变得"暴风雨"。许多风暴从"阵风"开始，随后发展成"大风"，再进一步变成"飓风"，甚至演变为"龙卷风"。在极端情况下，一个"灾难性的"事件可能会危及社区。`,
                 tags: ["自然", "地理", "气候"],
                 level: "intermediate",
                 date: "2024-01-15"
@@ -301,7 +299,7 @@ On dry days, the same processes lead to "arid" land. In arid regions, the ground
             {
                 title: "The Art of Slow Living",
                 english: "In a world that constantly pushes us to move faster, do more, and achieve greater heights, there's a growing movement towards slow living. This philosophy encourages us to savor each moment, find joy in simplicity, and cultivate mindfulness in our daily lives.\n\nSlow living is not about being unproductive or lazy; rather, it's about intentionality. It's about focusing on what truly matters, eliminating unnecessary busyness, and creating space for the things that bring us genuine happiness and fulfillment.",
-                chinese: "在一个不断推动我们更快前进、做得更多、追求更高成就的世界里，慢生活的运动正在兴起。这种哲学鼓励我们品味每一个时刻，在简单中寻找快乐，并在日常生活中培养正念。\n\n慢生活并不是指不高效或懒惰；相反，它是关于 intentionality（ intentionality）。它是关于专注于真正重要的事情，消除不必要的忙碌，为那些给我们带来真正快乐和满足感的事情创造空间。",
+                chinese: "在一个不断推动我们更快前进、做得更多、追求更高成就的世界里，慢生活的运动正在兴起。这种哲学鼓励我们品味每一个时刻，在简单中寻找快乐，并在日常生活中培养正念。\n\n慢生活并不是指不高效或懒惰；相反，它是关于 intentionality。它是关于专注于真正重要的事情，消除不必要的忙碌，为那些给我们带来真正快乐和满足感的事情创造空间。",
                 tags: ["生活", "哲学", "健康"],
                 level: "beginner",
                 date: "2024-01-10"
@@ -435,7 +433,7 @@ On dry days, the same processes lead to "arid" land. In arid regions, the ground
 
     verifyAdmin() {
         const inputKey = document.getElementById('admin-key').value;
-        
+
         if (inputKey === ADMIN_KEY) {
             this.setAdminStatus(true);
             this.closeAdminModal();
@@ -481,9 +479,9 @@ On dry days, the same processes lead to "arid" land. In arid regions, the ground
     renderTags() {
         const tagsContainer = document.getElementById('tags-filter');
         const tags = this.getAllTags();
-        
+
         tagsContainer.innerHTML = '';
-        
+
         const allBtn = document.createElement('button');
         allBtn.className = 'tag-btn' + (!this.activeTag ? ' active' : '');
         allBtn.textContent = '全部';
@@ -493,7 +491,7 @@ On dry days, the same processes lead to "arid" land. In arid regions, the ground
             this.renderTags();
         });
         tagsContainer.appendChild(allBtn);
-        
+
         tags.forEach(tag => {
             const btn = document.createElement('button');
             btn.className = 'tag-btn' + (this.activeTag === tag ? ' active' : '');
@@ -509,33 +507,33 @@ On dry days, the same processes lead to "arid" land. In arid regions, the ground
 
     filterArticles() {
         this.filteredArticles = this.articles.filter(article => {
-            const matchesSearch = !this.searchQuery || 
+            const matchesSearch = !this.searchQuery ||
                 article.title.toLowerCase().includes(this.searchQuery) ||
                 (article.english && article.english.toLowerCase().includes(this.searchQuery)) ||
                 (article.chinese && article.chinese.includes(this.searchQuery)) ||
                 (article.tags && article.tags.some(tag => tag.toLowerCase().includes(this.searchQuery)));
-            
+
             const matchesTag = !this.activeTag || (article.tags && article.tags.includes(this.activeTag));
-            
+
             return matchesSearch && matchesTag;
         });
-        
+
         this.renderArticles();
     }
 
     renderArticles() {
         const grid = document.getElementById('articles-grid');
         const emptyState = document.getElementById('empty-state');
-        
+
         if (this.filteredArticles.length === 0) {
             grid.innerHTML = '';
             emptyState.classList.add('show');
             return;
         }
-        
+
         emptyState.classList.remove('show');
         grid.innerHTML = this.filteredArticles.map(article => this.createArticleCard(article)).join('');
-        
+
         grid.querySelectorAll('.article-card').forEach(card => {
             card.addEventListener('click', (e) => {
                 if (!e.target.closest('.card-actions')) {
@@ -569,7 +567,7 @@ On dry days, the same processes lead to "arid" land. In arid regions, the ground
             intermediate: '中级',
             advanced: '高级'
         };
-        
+
         const deleteBtn = this.isAdmin ? `
             <button class="card-action-btn delete" title="删除">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
@@ -579,7 +577,7 @@ On dry days, the same processes lead to "arid" land. In arid regions, the ground
                 </svg>
             </button>
         ` : '';
-        
+
         return `
             <div class="article-card" data-id="${article.id}">
                 <div class="card-header">
@@ -613,24 +611,42 @@ On dry days, the same processes lead to "arid" land. In arid regions, the ground
         return text.split(/\s+/).filter(word => word.length > 0).length;
     }
 
+    splitSentences(text) {
+        const sentences = [];
+        const regex = /[^。！？\.\!\?\n]+[。！？\.\!\?\n]?/g;
+        let match;
+        while ((match = regex.exec(text)) !== null) {
+            const s = match[0].trim();
+            if (s) sentences.push(s);
+        }
+        return sentences.length ? sentences : [text.trim()];
+    }
+
+    buildSentenceSpans(text, lang) {
+        const sentences = this.splitSentences(text);
+        return sentences.map((s, i) =>
+            `<span class="sent-${lang}" data-idx="${i}">${s}</span>`
+        ).join(' ');
+    }
+
     showArticleDetail(id) {
         const article = this.articles.find(a => a.id == id);
         if (!article) return;
-        
+
         const levelLabels = {
             beginner: '入门级',
             intermediate: '中级',
             advanced: '高级'
         };
-        
+
         const enParagraphs = article.english.split('\n\n').filter(p => p.trim());
         const zhParagraphs = article.chinese.split('\n\n').filter(p => p.trim());
-        
+
         const pairs = enParagraphs.map((en, i) => ({
             en,
             zh: zhParagraphs[i] || ''
         }));
-        
+
         const deleteBtn = this.isAdmin ? `
             <button class="detail-action-btn delete" data-id="${article.id}">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
@@ -641,7 +657,7 @@ On dry days, the same processes lead to "arid" land. In arid regions, the ground
                 删除
             </button>
         ` : '';
-        
+
         document.getElementById('article-detail').innerHTML = `
             <div class="detail-header">
                 <h1 class="detail-title">${article.title}</h1>
@@ -667,12 +683,14 @@ On dry days, the same processes lead to "arid" land. In arid regions, the ground
             <div class="article-content">
                 ${pairs.map(pair => `
                     <div class="paragraph-pair">
-                        <p class="paragraph-en">${pair.en}</p>
-                        <p class="paragraph-zh">${pair.zh}</p>
+                        <p class="paragraph-en">${this.buildSentenceSpans(pair.en, 'en')}</p>
+                        <p class="paragraph-zh">${this.buildSentenceSpans(pair.zh, 'zh')}</p>
                     </div>
                 `).join('')}
             </div>
         `;
+
+        this.bindSentenceHover();
 
         if (this.isAdmin) {
             document.querySelector('.detail-action-btn.edit')?.addEventListener('click', () => {
@@ -683,23 +701,72 @@ On dry days, the same processes lead to "arid" land. In arid regions, the ground
                 this.showDeleteModal(article.id);
             });
         }
-        
+
         this.switchView('detail');
+    }
+
+    bindSentenceHover() {
+        document.querySelectorAll('.sent-en').forEach(el => {
+            el.addEventListener('mouseenter', () => {
+                const idx = el.dataset.idx;
+                const pair = el.closest('.paragraph-pair');
+                const zh = pair.querySelector(`.sent-zh[data-idx="${idx}"]`);
+                if (zh) zh.classList.add('highlight');
+            });
+            el.addEventListener('mouseleave', () => {
+                const idx = el.dataset.idx;
+                const pair = el.closest('.paragraph-pair');
+                const zh = pair.querySelector(`.sent-zh[data-idx="${idx}"]`);
+                if (zh) zh.classList.remove('highlight');
+            });
+        });
+
+        document.querySelectorAll('.sent-zh').forEach(el => {
+            el.addEventListener('mouseenter', () => {
+                const idx = el.dataset.idx;
+                const pair = el.closest('.paragraph-pair');
+                const en = pair.querySelector(`.sent-en[data-idx="${idx}"]`);
+                if (en) en.classList.add('highlight');
+            });
+            el.addEventListener('mouseleave', () => {
+                const idx = el.dataset.idx;
+                const pair = el.closest('.paragraph-pair');
+                const en = pair.querySelector(`.sent-en[data-idx="${idx}"]`);
+                if (en) en.classList.remove('highlight');
+            });
+        });
     }
 
     showArticleModal(id) {
         const article = this.articles.find(a => a.id == id);
         if (!article) return;
-        
+
         const levelLabels = {
             beginner: '入门级',
             intermediate: '中级',
             advanced: '高级'
         };
-        
-        const enContent = article.english.replace(/\n\n/g, ' ').trim();
-        const zhContent = article.chinese.replace(/\n\n/g, ' ').trim();
-        
+
+        const enParagraphs = article.english.split('\n\n').filter(p => p.trim());
+        const zhParagraphs = article.chinese.split('\n\n').filter(p => p.trim());
+
+        let allEnSpans = '';
+        let allZhSpans = '';
+        let sentIdx = 0;
+        enParagraphs.forEach((enPara, pi) => {
+            const enSentences = this.splitSentences(enPara);
+            const zhSentences = this.splitSentences(zhParagraphs[pi] || '');
+            const maxLen = Math.max(enSentences.length, zhSentences.length);
+            for (let i = 0; i < maxLen; i++) {
+                const en = enSentences[i] || '';
+                const zh = zhSentences[i] || '';
+                if (!en && !zh) continue;
+                allEnSpans += `<span class="sent-en" data-idx="${sentIdx}">${en}</span> `;
+                allZhSpans += `<span class="sent-zh" data-idx="${sentIdx}">${zh}</span> `;
+                sentIdx++;
+            }
+        });
+
         document.getElementById('modal-content').innerHTML = `
             <h1 class="detail-title">${article.title}</h1>
             <div class="detail-meta">
@@ -714,12 +781,14 @@ On dry days, the same processes lead to "arid" land. In arid regions, the ground
                     <div class="column-title">中文译文</div>
                 </div>
                 <div class="paragraph-pair">
-                    <p class="paragraph-en">${enContent}</p>
-                    <p class="paragraph-zh">${zhContent}</p>
+                    <p class="paragraph-en">${allEnSpans}</p>
+                    <p class="paragraph-zh">${allZhSpans}</p>
                 </div>
             </div>
         `;
-        
+
+        this.bindSentenceHover();
+
         document.getElementById('article-modal-overlay').classList.add('show');
         document.body.style.overflow = 'hidden';
     }
@@ -734,44 +803,39 @@ On dry days, the same processes lead to "arid" land. In arid regions, the ground
             this.showToast('请先登录管理员账号！', 'warning');
             return;
         }
-        
+
         const title = document.getElementById('article-title').value.trim();
         const tags = document.getElementById('article-tags').value.split(',').map(t => t.trim()).filter(t => t);
         const level = document.getElementById('article-level').value;
         const english = document.getElementById('article-english').value.trim();
         const chinese = document.getElementById('article-chinese').value.trim();
-        
+
         if (!title || !english || !chinese) {
             this.showToast('请填写完整信息！', 'error');
             return;
         }
-        
-        if (!this.dbReady || !firestoreDb) {
-            this.showToast('数据库未连接！', 'error');
-            return;
-        }
-        
+
         try {
-            await firestoreDb.collection('articles').add({
+            const db = await this.getDb();
+            await db.collection('articles').add({
                 title: title,
                 english: english,
                 chinese: chinese,
                 tags: tags.length ? tags : ['未分类'],
                 level: level,
-                date: new Date().toISOString().split('T')[0],
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                date: new Date().toISOString().split('T')[0]
             });
-            
+
             await this.loadFromStorage();
             this.renderArticles();
             this.renderTags();
-            
+
             document.getElementById('upload-form').reset();
             this.showToast('文章添加成功！', 'success');
             this.switchView('list');
         } catch (error) {
             console.error('添加文章失败:', error);
-            this.showToast('添加文章失败，请重试', 'error');
+            this.showToast('添加文章失败: ' + error.message, 'error');
         }
     }
 
@@ -780,18 +844,18 @@ On dry days, the same processes lead to "arid" land. In arid regions, the ground
             this.showToast('请先登录管理员账号！', 'warning');
             return;
         }
-        
+
         try {
             await this.addSampleArticles();
             await this.loadFromStorage();
             this.renderArticles();
             this.renderTags();
-            
+
             this.showToast('示例文章加载成功！', 'success');
             this.switchView('list');
         } catch (error) {
             console.error('加载示例文章失败:', error);
-            this.showToast('加载示例文章失败，请重试', 'error');
+            this.showToast('加载示例文章失败: ' + error.message, 'error');
         }
     }
 
@@ -814,30 +878,32 @@ On dry days, the same processes lead to "arid" land. In arid regions, the ground
             this.showToast('请先登录管理员账号！', 'warning');
             return;
         }
-        
+
         if (this.deletingArticleId === null) return;
-        
+
         try {
-            if (!this.dbReady || !firestoreDb) {
-                this.showToast('数据库未连接！', 'error');
+            const articleToDelete = this.articles.find(a => a.id == this.deletingArticleId);
+            if (!articleToDelete || !articleToDelete.objectId) {
+                this.showToast('文章不存在', 'error');
                 return;
             }
-            
-            await firestoreDb.collection('articles').doc(this.deletingArticleId).delete();
-            
+
+            const db = await this.getDb();
+            await db.collection('articles').doc(articleToDelete.objectId).remove();
+
             await this.loadFromStorage();
             this.renderArticles();
             this.renderTags();
-            
+
             this.closeDeleteModal();
             this.showToast('文章删除成功！', 'success');
-            
+
             if (document.getElementById('detail-view').classList.contains('active')) {
                 this.switchView('list');
             }
         } catch (error) {
             console.error('删除文章失败:', error);
-            this.showToast('删除文章失败，请重试', 'error');
+            this.showToast('删除文章失败: ' + error.message, 'error');
         }
     }
 
@@ -846,18 +912,18 @@ On dry days, the same processes lead to "arid" land. In arid regions, the ground
             this.showToast('请先登录管理员账号！', 'warning');
             return;
         }
-        
+
         const article = this.articles.find(a => a.id == id);
         if (!article) return;
-        
+
         this.editingArticleId = id;
-        
+
         document.getElementById('edit-title').value = article.title;
         document.getElementById('edit-tags').value = article.tags ? article.tags.join(', ') : '';
         document.getElementById('edit-level').value = article.level;
         document.getElementById('edit-english').value = article.english;
         document.getElementById('edit-chinese').value = article.chinese;
-        
+
         document.getElementById('edit-modal').classList.add('show');
     }
 
@@ -871,47 +937,49 @@ On dry days, the same processes lead to "arid" land. In arid regions, the ground
             this.showToast('请先登录管理员账号！', 'warning');
             return;
         }
-        
+
         if (this.editingArticleId === null) return;
-        
+
         const title = document.getElementById('edit-title').value.trim();
         const tags = document.getElementById('edit-tags').value.split(',').map(t => t.trim()).filter(t => t);
         const level = document.getElementById('edit-level').value;
         const english = document.getElementById('edit-english').value.trim();
         const chinese = document.getElementById('edit-chinese').value.trim();
-        
+
         if (!title || !english || !chinese) {
             this.showToast('请填写完整信息！', 'error');
             return;
         }
-        
+
         try {
-            if (!this.dbReady || !firestoreDb) {
-                this.showToast('数据库未连接！', 'error');
+            const articleToEdit = this.articles.find(a => a.id == this.editingArticleId);
+            if (!articleToEdit || !articleToEdit.objectId) {
+                this.showToast('文章不存在', 'error');
                 return;
             }
-            
-            await firestoreDb.collection('articles').doc(this.editingArticleId).update({
+
+            const db = await this.getDb();
+            await db.collection('articles').doc(articleToEdit.objectId).update({
                 title: title,
                 english: english,
                 chinese: chinese,
                 tags: tags.length ? tags : ['未分类'],
                 level: level
             });
-            
+
             await this.loadFromStorage();
             this.renderArticles();
             this.renderTags();
-            
+
             this.closeEditModal();
             this.showToast('文章编辑成功！', 'success');
-            
+
             if (document.getElementById('detail-view').classList.contains('active')) {
                 this.showArticleDetail(this.editingArticleId);
             }
         } catch (error) {
             console.error('编辑文章失败:', error);
-            this.showToast('编辑文章失败，请重试', 'error');
+            this.showToast('编辑文章失败: ' + error.message, 'error');
         }
     }
 }
