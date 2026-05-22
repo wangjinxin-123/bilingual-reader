@@ -764,10 +764,6 @@ class BilingualReader {
         const contentEl = container.querySelector('.article-content');
         if (!slider || !contentEl) return;
 
-        const isMobile = window.innerWidth <= 768;
-        const defaultValue = isMobile ? 0 : 50;
-        slider.value = defaultValue;
-
         const updateZoom = () => {
             const zoom = parseInt(slider.value);
             const scale = 0.5 + (zoom / 100) * 1.0;
@@ -787,7 +783,13 @@ class BilingualReader {
         const content = container.querySelector('.article-content');
         if (!content) return;
 
-        btn.style.display = 'none';
+        btn.addEventListener('click', () => {
+            const current = content.dataset.orientation;
+            const next = current === 'landscape' ? 'portrait' : 'landscape';
+            content.dataset.orientation = next;
+            btn.textContent = next === 'landscape' ? '🔄' : '📱';
+            btn.title = next === 'landscape' ? '切换到竖屏' : '切换到横屏';
+        });
     }
 
     bindDetailScrollHide() {
