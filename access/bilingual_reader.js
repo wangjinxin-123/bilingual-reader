@@ -764,6 +764,10 @@ class BilingualReader {
         const contentEl = container.querySelector('.article-content');
         if (!slider || !contentEl) return;
 
+        const isMobile = window.innerWidth <= 768;
+        const defaultValue = isMobile ? 0 : 50;
+        slider.value = defaultValue;
+
         const updateZoom = () => {
             const zoom = parseInt(slider.value);
             const scale = 0.5 + (zoom / 100) * 1.0;
