@@ -668,34 +668,37 @@ class BilingualReader {
         const detailContainer = document.getElementById('article-detail');
         detailContainer.innerHTML = `
             <div class="detail-sticky-header">
-                <div class="detail-header">
-                    <h1 class="detail-title">${article.title}</h1>
-                    <div class="detail-actions">
-                        ${this.isAdmin ? `
-                        <button class="detail-action-btn edit" data-id="${article.id}">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
-                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                            </svg>
-                            编辑
-                        </button>
-                        ` : ''}
-                        ${deleteBtn}
+                <div class="detail-header-info">
+                    <div class="detail-header">
+                        <h1 class="detail-title">${article.title}</h1>
+                        <div class="detail-actions">
+                            ${this.isAdmin ? `
+                            <button class="detail-action-btn edit" data-id="${article.id}">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                </svg>
+                                编辑
+                            </button>
+                            ` : ''}
+                            ${deleteBtn}
+                        </div>
                     </div>
-                </div>
-                <div class="detail-meta">
-                    <span class="detail-level ${article.level}">${levelLabels[article.level] || '中级'}</span>
-                    <div class="detail-tags">
-                        ${article.tags ? article.tags.map(tag => `<span class="detail-tag">${tag}</span>`).join('') : ''}
+                    <div class="detail-meta">
+                        <span class="detail-level ${article.level}">${levelLabels[article.level] || '中级'}</span>
+                        <div class="detail-tags">
+                            ${article.tags ? article.tags.map(tag => `<span class="detail-tag">${tag}</span>`).join('') : ''}
+                        </div>
                     </div>
                 </div>
                 <div class="zoom-slider-container">
                     <span class="zoom-cat">🐱</span>
                     <input type="range" class="zoom-slider" min="0" max="100" value="50">
                     <span class="zoom-value">50%</span>
+                    <button class="orientation-btn" title="切换横竖屏">🔄</button>
                 </div>
             </div>
-            <div class="article-content">
+            <div class="article-content" data-orientation="landscape">
                 ${pairs.map(pair => `
                     <div class="paragraph-pair">
                         <p class="paragraph-en">${this.buildSentenceSpans(pair.en, 'en')}</p>
@@ -707,6 +710,8 @@ class BilingualReader {
 
         this.bindSentenceHover();
         this.bindZoomSlider(detailContainer);
+        this.bindOrientationToggle(detailContainer);
+        this.bindDetailScrollHide();
 
         if (this.isAdmin) {
             document.querySelector('.detail-action-btn.edit')?.addEventListener('click', () => {
@@ -772,6 +777,53 @@ class BilingualReader {
         updateZoom();
     }
 
+    bindOrientationToggle(container) {
+        const btn = container.querySelector('.orientation-btn');
+        if (!btn) return;
+        const content = container.querySelector('.article-content');
+        if (!content) return;
+
+        btn.addEventListener('click', () => {
+            const current = content.dataset.orientation;
+            const next = current === 'landscape' ? 'portrait' : 'landscape';
+            content.dataset.orientation = next;
+            btn.textContent = next === 'landscape' ? '🔄' : '📱';
+            btn.title = next === 'landscape' ? '切换到竖屏' : '切换到横屏';
+        });
+    }
+
+    bindDetailScrollHide() {
+        const header = document.querySelector('.detail-sticky-header');
+        if (!header) return;
+
+        const handler = () => {
+            const detailEl = document.querySelector('.article-detail');
+            if (!detailEl) return;
+            const rect = detailEl.getBoundingClientRect();
+            if (rect.top < -10) {
+                header.classList.add('scrolled');
+            } else {
+                header.classList.remove('scrolled');
+            }
+        };
+
+        window.addEventListener('scroll', handler, { passive: true });
+    }
+
+    bindModalScrollHide(container) {
+        const header = container.querySelector('.modal-sticky-header');
+        if (!header) return;
+        const scrollEl = container.closest('.modal-content') || container;
+
+        scrollEl.addEventListener('scroll', () => {
+            if (scrollEl.scrollTop > 10) {
+                header.classList.add('scrolled');
+            } else {
+                header.classList.remove('scrolled');
+            }
+        }, { passive: true });
+    }
+
     showArticleModal(id) {
         const article = this.articles.find(a => a.id == id);
         if (!article) return;
@@ -805,20 +857,23 @@ class BilingualReader {
         const modalContent = document.getElementById('modal-content');
         modalContent.innerHTML = `
             <div class="modal-sticky-header">
-                <h1 class="detail-title">${article.title}</h1>
-                <div class="detail-meta">
-                    <span class="detail-level ${article.level}">${levelLabels[article.level] || '中级'}</span>
-                    <div class="detail-tags">
-                        ${article.tags ? article.tags.map(tag => `<span class="detail-tag">${tag}</span>`).join('') : ''}
+                <div class="modal-header-info">
+                    <h1 class="detail-title">${article.title}</h1>
+                    <div class="detail-meta">
+                        <span class="detail-level ${article.level}">${levelLabels[article.level] || '中级'}</span>
+                        <div class="detail-tags">
+                            ${article.tags ? article.tags.map(tag => `<span class="detail-tag">${tag}</span>`).join('') : ''}
+                        </div>
                     </div>
                 </div>
                 <div class="zoom-slider-container">
                     <span class="zoom-cat">🐱</span>
                     <input type="range" class="zoom-slider" min="0" max="100" value="50">
                     <span class="zoom-value">50%</span>
+                    <button class="orientation-btn" title="切换横竖屏">🔄</button>
                 </div>
             </div>
-            <div class="article-content">
+            <div class="article-content" data-orientation="landscape">
                 <div class="columns-header">
                     <div class="column-title">English</div>
                     <div class="column-title">中文译文</div>
@@ -832,6 +887,8 @@ class BilingualReader {
 
         this.bindSentenceHover();
         this.bindZoomSlider(modalContent);
+        this.bindOrientationToggle(modalContent);
+        this.bindModalScrollHide(modalContent);
 
         document.getElementById('article-modal-overlay').classList.add('show');
         document.body.style.overflow = 'hidden';
