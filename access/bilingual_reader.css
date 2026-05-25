@@ -2055,6 +2055,142 @@ body {
     flex: 1;
 }
 
+.help-btn {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--grad);
+    border: none;
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    box-shadow: 0 4px 20px rgba(125, 211, 252, 0.3);
+    transition: var(--transition-fast);
+}
+
+.help-btn:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 28px rgba(125, 211, 252, 0.45);
+}
+
+.help-btn:active {
+    transform: scale(0.95);
+}
+
+.help-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    opacity: 0;
+    visibility: hidden;
+    transition: var(--transition);
+}
+
+.help-overlay.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+.help-modal {
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    max-width: 520px;
+    width: 90%;
+    max-height: 80vh;
+    padding: 40px 36px 32px;
+    position: relative;
+    overflow-y: auto;
+    box-shadow: var(--shadow-lg);
+}
+
+.help-close-btn {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border);
+    color: var(--text-2);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition-fast);
+}
+
+.help-close-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: var(--text-1);
+}
+
+.help-title {
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--text-1);
+    margin-bottom: 24px;
+    text-align: center;
+}
+
+.help-content {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.help-section h3 {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--accent);
+    margin-bottom: 6px;
+}
+
+.help-section p {
+    font-size: 14px;
+    line-height: 1.8;
+    color: var(--text-2);
+    margin: 0;
+}
+
+.help-section p strong {
+    color: var(--accent-2);
+}
+
+@media (max-width: 768px) {
+    .help-btn {
+        bottom: 16px;
+        right: 16px;
+        width: 44px;
+        height: 44px;
+    }
+
+    .help-modal {
+        padding: 28px 20px 24px;
+        max-height: 85vh;
+    }
+
+    .help-title {
+        font-size: 20px;
+    }
+}
+
 @keyframes toastSlideIn {
     0% {
         opacity: 0;

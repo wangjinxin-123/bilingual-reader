@@ -7,11 +7,11 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=Inter:wght@300;400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Noto+Sans+SC:wght@300;400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="bilingual_reader.css?v=5">
+    <link rel="stylesheet" href="bilingual_reader.css?v=6">
     <script src="https://static.cloudbase.net/cloudbase-js-sdk/latest/cloudbase.js"></script>
     <script src="https://static.cloudbase.net/cloudbase-js-sdk/latest/cloudbase.auth.js"></script>
     <script src="https://static.cloudbase.net/cloudbase-js-sdk/latest/cloudbase.database.js"></script>
-    <script src="bilingual_reader.js?v=5"></script>
+    <script src="bilingual_reader.js?v=6"></script>
 </head>
 <body>
     <div class="bg-animation">
@@ -211,6 +211,56 @@
             <div class="modal-actions">
                 <button class="modal-btn cancel" id="logout-cancel">取消</button>
                 <button class="modal-btn confirm" id="logout-confirm">确认退出</button>
+            </div>
+        </div>
+    </div>
+
+    <button class="help-btn" id="help-btn" title="使用说明">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+            <path d="M12 6v7"></path>
+            <path d="M12 16v.01"></path>
+        </svg>
+    </button>
+
+    <div class="help-overlay" id="help-overlay">
+        <div class="help-modal">
+            <button class="help-close-btn" id="help-close-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                    <path d="M18 6L6 18M6 6l12 12"></path>
+                </svg>
+            </button>
+            <h2 class="help-title">📖 使用说明书</h2>
+            <div class="help-content">
+                <div class="help-section">
+                    <h3>📋 文章列表</h3>
+                    <p>主页展示所有文章的卡片列表，每张卡片显示标题、预览、标签和难度等级。点击卡片即可打开文章阅读。</p>
+                </div>
+                <div class="help-section">
+                    <h3>🔍 搜索与筛选</h3>
+                    <p>在搜索框中输入关键词可搜索文章标题或标签。点击标签按钮可按分类筛选文章。</p>
+                </div>
+                <div class="help-section">
+                    <h3>📖 阅读文章</h3>
+                    <p>文章页面采用双语对照排版，英文在左、中文在右。滚动时标题会自动隐藏，让你专注阅读内容。</p>
+                </div>
+                <div class="help-section">
+                    <h3>🔍 句子高亮</h3>
+                    <p>鼠标悬停在句子上，对应的中/英文句子会高亮显示，方便对照阅读。</p>
+                </div>
+                <div class="help-section">
+                    <h3>⭐ 句子书签</h3>
+                    <p><strong>双击</strong>任意句子，该句子会变成彩虹渐变色，标记为书签。一篇文章只能有一个书签，双击其他句子会替换书签。刷新页面书签仍然保留。</p>
+                </div>
+                <div class="help-section">
+                    <h3>🔧 字体缩放</h3>
+                    <p>文章顶部的彩虹滑块可以调节文字大小。手机端默认 0%，电脑端默认 50%。</p>
+                </div>
+                <div class="help-section">
+                    <h3>🔐 管理员登录</h3>
+                    <p>点击顶部 <strong>B</strong> 图标即可弹出管理员登录窗口，输入密钥后可上传、编辑和删除文章。</p>
+                </div>
             </div>
         </div>
     </div>

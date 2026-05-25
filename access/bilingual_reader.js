@@ -426,6 +426,28 @@ class BilingualReader {
                 this.closeLogoutModal();
             }
         });
+
+        document.getElementById('help-btn').addEventListener('click', () => {
+            this.showHelpModal();
+        });
+
+        document.getElementById('help-close-btn').addEventListener('click', () => {
+            this.closeHelpModal();
+        });
+
+        document.getElementById('help-overlay').addEventListener('click', (e) => {
+            if (e.target.id === 'help-overlay') {
+                this.closeHelpModal();
+            }
+        });
+    }
+
+    showHelpModal() {
+        document.getElementById('help-overlay').classList.add('show');
+    }
+
+    closeHelpModal() {
+        document.getElementById('help-overlay').classList.remove('show');
     }
 
     showAdminModal() {
