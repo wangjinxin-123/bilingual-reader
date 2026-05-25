@@ -774,7 +774,7 @@ class BilingualReader {
             el._clickTimestamps.push(Date.now());
             el._clickTimestamps = el._clickTimestamps.filter(t => Date.now() - t < 500);
 
-            if (el._clickTimestamps.length >= 3) {
+            if (el._clickTimestamps.length >= 2) {
                 el._clickTimestamps = [];
 
                 const currentBookmark = localStorage.getItem(bookmarkKey);
