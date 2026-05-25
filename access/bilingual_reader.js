@@ -709,6 +709,7 @@ class BilingualReader {
         `;
 
         this.bindSentenceHover();
+        this.bindSentenceBookmark(article.id);
         this.bindZoomSlider(detailContainer);
         this.bindOrientationToggle(detailContainer);
         this.bindDetailScrollHide();
@@ -756,6 +757,51 @@ class BilingualReader {
                 if (en) en.classList.remove('highlight');
             });
         });
+    }
+
+    bindSentenceBookmark(articleId) {
+        const bookmarkKey = `bookmark_${articleId}`;
+
+        const bookmarkedIdx = localStorage.getItem(bookmarkKey);
+        if (bookmarkedIdx !== null) {
+            this._applyBookmark(bookmarkedIdx);
+        }
+
+        const handleClick = (el) => {
+            const idx = el.dataset.idx;
+
+            if (!el._clickTimestamps) el._clickTimestamps = [];
+            el._clickTimestamps.push(Date.now());
+            el._clickTimestamps = el._clickTimestamps.filter(t => Date.now() - t < 500);
+
+            if (el._clickTimestamps.length >= 3) {
+                el._clickTimestamps = [];
+
+                const currentBookmark = localStorage.getItem(bookmarkKey);
+                if (currentBookmark === idx) return;
+
+                if (currentBookmark !== null) {
+                    this._removeBookmark(currentBookmark);
+                }
+
+                localStorage.setItem(bookmarkKey, idx);
+                this._applyBookmark(idx);
+            }
+        };
+
+        document.querySelectorAll('.sent-en, .sent-zh').forEach(el => {
+            el.addEventListener('click', () => handleClick(el));
+        });
+    }
+
+    _applyBookmark(idx) {
+        document.querySelectorAll(`.sent-en[data-idx="${idx}"]`).forEach(el => el.classList.add('bookmarked'));
+        document.querySelectorAll(`.sent-zh[data-idx="${idx}"]`).forEach(el => el.classList.add('bookmarked'));
+    }
+
+    _removeBookmark(idx) {
+        document.querySelectorAll(`.sent-en[data-idx="${idx}"]`).forEach(el => el.classList.remove('bookmarked'));
+        document.querySelectorAll(`.sent-zh[data-idx="${idx}"]`).forEach(el => el.classList.remove('bookmarked'));
     }
 
     bindZoomSlider(container) {
@@ -890,6 +936,7 @@ class BilingualReader {
         `;
 
         this.bindSentenceHover();
+        this.bindSentenceBookmark(article.id);
         this.bindZoomSlider(modalContent);
         this.bindOrientationToggle(modalContent);
         this.bindModalScrollHide(modalContent);

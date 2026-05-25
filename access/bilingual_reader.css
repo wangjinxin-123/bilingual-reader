@@ -989,6 +989,26 @@ body {
     text-shadow: 0 0 12px rgba(192, 132, 252, 0.5), 0 0 24px rgba(192, 132, 252, 0.25);
 }
 
+.sent-en.bookmarked, .sent-zh.bookmarked {
+    background: linear-gradient(120deg, #ff6b6b, #ffd93d, #6bcb77, #4d96ff, #9b59b6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-weight: 600;
+}
+
+.sent-en.bookmarked.highlight {
+    -webkit-text-fill-color: #38bdf8;
+    color: #38bdf8;
+    text-shadow: 0 0 12px rgba(125, 211, 252, 0.5), 0 0 24px rgba(125, 211, 252, 0.25);
+}
+
+.sent-zh.bookmarked.highlight {
+    -webkit-text-fill-color: #c084fc;
+    color: #c084fc;
+    text-shadow: 0 0 12px rgba(192, 132, 252, 0.5), 0 0 24px rgba(192, 132, 252, 0.25);
+}
+
 .paragraph-en {
     font-family: var(--font-serif-en);
     font-size: calc(20px * var(--zoom-scale, 1));
